@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Pueblo 3D — Simulador de vida</title>
+    <link rel="stylesheet" href="css/style.css" />
+  </head>
+  <body>
+    <canvas id="renderCanvas"></canvas>
+
+    <div id="hud">
+      <!-- Barra superior -->
+      <div id="top-bar">
+        <span id="hud-money">🪙 0</span>
+        <span id="hud-day">📅 Día 1</span>
+        <span id="hud-time">🕒 06:00</span>
+        <span class="spacer"></span>
+        <button id="btn-save" title="Guardar partida">💾 Guardar</button>
+        <button id="btn-help" title="Ayuda (H)">❓ Ayuda</button>
+        <button id="btn-new" title="Borrar partida y empezar de nuevo">🗑 Nueva</button>
+      </div>
+
+      <!-- Panel de misiones -->
+      <div id="quest-panel">
+        <h3>📜 Misiones</h3>
+        <div id="quest-list"></div>
+      </div>
+
+      <!-- Notificaciones -->
+      <div id="notifications"></div>
+
+      <!-- Pista de interacción -->
+      <div id="hint" class="hidden"></div>
+
+      <!-- Inventario -->
+      <div id="inventory"></div>
+
+      <!-- Diálogo con NPC -->
+      <div id="dialog" class="modal hidden">
+        <div id="dialog-name" class="modal-title"></div>
+        <div id="dialog-text"></div>
+        <div id="dialog-buttons" class="modal-buttons"></div>
+      </div>
+
+      <!-- Tienda -->
+      <div id="shop" class="modal hidden">
+        <div class="modal-title">🛒 Tienda de Marta</div>
+        <div id="shop-money"></div>
+        <div id="shop-items"></div>
+        <div class="modal-buttons">
+          <button id="shop-close">Cerrar</button>
+        </div>
+      </div>
+
+      <!-- Ayuda -->
+      <div id="help" class="modal hidden">
+        <div class="modal-title">❓ Cómo jugar</div>
+        <div id="help-text">
+          <p><b>Objetivo:</b> cultiva, vende, haz amigos y completa misiones.</p>
+          <p>
+            <b>WASD / Flechas</b> — moverse<br />
+            <b>E</b> — interactuar (plantar, regar, cosechar, hablar, vender)<br />
+            <b>1 / 2 / 3</b> — elegir semilla (🥕 zanahoria, 🍅 tomate, 🎃 calabaza)<br />
+            <b>H</b> — mostrar/ocultar esta ayuda · <b>Esc</b> — cerrar ventanas
+          </p>
+          <p>
+            <b>La granja:</b> planta semillas en los surcos marrones, <b>riégalos cada día</b> (si
+            pasan 2 días sin agua se marchitan) y cosecha cuando estén maduros. Vende la cosecha en
+            la <b>caja de ventas</b> junto a la granja.
+          </p>
+          <p>
+            <b>Vecinos</b> (habla con ellos para subir amistad, o regálales cosas):<br />
+            🩷 <b>Marta</b> — la tendera (tienda rosa, al este). Vende semillas y regalos.<br />
+            ⬜ <b>Gon</b> — el herrero (casa gris, al oeste).<br />
+            💚 <b>Lila</b> — la florista (jardín, al norte).
+          </p>
+          <p>El juego se <b>guarda automáticamente</b> al empezar cada día.</p>
+        </div>
+        <div class="modal-buttons">
+          <button id="help-close">¡A jugar!</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Babylon.js 9.17.0 + motor de física Cannon.js 0.6.2, servidos en local (sin CDN).
+         Van como UMD en public/: Vite los copia tal cual y no los empaqueta. -->
+    <script src="/vendor/babylon.js"></script>
+    <script src="/vendor/cannon.js"></script>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

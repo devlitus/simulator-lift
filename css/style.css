@@ -1,0 +1,297 @@
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  background: #1a1a2e;
+}
+
+#renderCanvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  outline: none;
+}
+
+/* El HUD no captura clics salvo en elementos interactivos */
+#hud {
+  pointer-events: none;
+}
+#hud button,
+#hud .modal {
+  pointer-events: auto;
+}
+
+/* ---------- Barra superior ---------- */
+#top-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 8px 14px;
+  background: rgba(10, 10, 25, 0.65);
+  color: #fff;
+  font-size: 15px;
+  z-index: 10;
+}
+#top-bar .spacer {
+  flex: 1;
+}
+#top-bar button {
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  color: #fff;
+  border-radius: 6px;
+  padding: 4px 10px;
+  cursor: pointer;
+  font-size: 13px;
+}
+#top-bar button:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+/* ---------- Panel de misiones ---------- */
+#quest-panel {
+  position: fixed;
+  top: 52px;
+  right: 12px;
+  width: 250px;
+  background: rgba(10, 10, 25, 0.65);
+  border-radius: 10px;
+  padding: 10px 12px;
+  color: #eee;
+  z-index: 9;
+}
+#quest-panel h3 {
+  margin: 0 0 6px;
+  font-size: 14px;
+}
+#quest-list .quest {
+  border-top: 1px solid rgba(255, 255, 255, 0.15);
+  padding: 6px 0;
+  font-size: 13px;
+}
+#quest-list .quest .q-title {
+  font-weight: 600;
+}
+#quest-list .quest .q-desc {
+  opacity: 0.8;
+  font-size: 12px;
+}
+#quest-list .quest .q-progress {
+  color: #ffd76b;
+  font-size: 12px;
+}
+#quest-list .quest.ready .q-progress {
+  color: #7dff8a;
+  font-weight: 600;
+}
+#quest-list .empty {
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+/* ---------- Notificaciones ---------- */
+#notifications {
+  position: fixed;
+  top: 52px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  z-index: 20;
+}
+.toast {
+  background: rgba(20, 20, 40, 0.9);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  padding: 7px 16px;
+  font-size: 14px;
+  animation:
+    toast-in 0.25s ease-out,
+    toast-out 0.5s ease-in 3s forwards;
+}
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes toast-out {
+  to {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+}
+
+/* ---------- Pista de interacción ---------- */
+#hint {
+  position: fixed;
+  bottom: 92px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(20, 20, 40, 0.85);
+  color: #ffe9a8;
+  border: 1px solid rgba(255, 233, 168, 0.4);
+  padding: 6px 18px;
+  border-radius: 999px;
+  font-size: 14px;
+  z-index: 9;
+  white-space: nowrap;
+}
+
+/* ---------- Inventario ---------- */
+#inventory {
+  position: fixed;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  background: rgba(10, 10, 25, 0.7);
+  border-radius: 12px 12px 0 0;
+  padding: 8px 18px;
+  color: #fff;
+  font-size: 14px;
+  z-index: 9;
+}
+#inventory .inv-section {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+#inventory .inv-label {
+  font-size: 11px;
+  opacity: 0.6;
+  text-transform: uppercase;
+}
+#inventory .item {
+  padding: 3px 8px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+#inventory .item.selected {
+  border-color: #ffd76b;
+  background: rgba(255, 215, 107, 0.15);
+}
+#inventory .item.empty {
+  opacity: 0.45;
+}
+
+/* ---------- Modales (diálogo, tienda, ayuda) ---------- */
+.modal {
+  position: fixed;
+  left: 50%;
+  bottom: 130px;
+  transform: translateX(-50%);
+  width: min(520px, 92vw);
+  background: rgba(15, 15, 35, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 12px;
+  padding: 14px 18px;
+  color: #eee;
+  z-index: 30;
+}
+#shop,
+#help {
+  bottom: auto;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  max-height: 80vh;
+  overflow-y: auto;
+}
+.modal-title {
+  font-size: 17px;
+  font-weight: 700;
+  margin-bottom: 8px;
+  color: #ffd76b;
+}
+#dialog-text {
+  font-size: 15px;
+  line-height: 1.45;
+  margin-bottom: 12px;
+}
+.modal-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.modal-buttons button {
+  background: #3d3d6b;
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 8px;
+  padding: 7px 12px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.modal-buttons button:hover:not(:disabled) {
+  background: #54548a;
+}
+.modal-buttons button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+#shop-money {
+  font-size: 14px;
+  margin-bottom: 10px;
+  color: #ffd76b;
+}
+.shop-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  font-size: 14px;
+}
+.shop-row .grow {
+  flex: 1;
+}
+.shop-row .owned {
+  opacity: 0.6;
+  font-size: 12px;
+}
+.shop-row button {
+  background: #2e6b3a;
+  color: #fff;
+  border: none;
+  border-radius: 7px;
+  padding: 6px 12px;
+  cursor: pointer;
+}
+.shop-row button:hover:not(:disabled) {
+  background: #3c8a4c;
+}
+.shop-row button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+#help-text {
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.hidden {
+  display: none !important;
+}
