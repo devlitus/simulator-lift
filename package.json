@@ -1,0 +1,29 @@
+{
+  "name": "pueblo-3d",
+  "version": "1.0.0",
+  "description": "Simulador de vida tipo pueblo 3D con Babylon.js (granja, NPCs, misiones, economía)",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "start": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.19.0",
+    "eslint": "^9.19.0",
+    "globals": "^15.14.0",
+    "prettier": "^3.4.2",
+    "typescript": "^5.7.3",
+    "typescript-eslint": "^8.64.0",
+    "vite": "^6.4.3",
+    "vitest": "^3.0.4",
+    "zod": "^3.25.76"
+  }
+}

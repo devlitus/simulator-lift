@@ -1,0 +1,26 @@
+# Dependencias y build
+/node_modules
+/dist
+
+# Vercel (config local del CLI)
+.vercel
+
+# Variables de entorno (nunca subir secretos)
+.env
+.env.*
+!.env.example
+
+# Herramientas locales
+.playwright-mcp/
+.claude/settings.local.json
+.claude/scheduled_tasks.lock
+
+# Logs y temporales
+*.log
+pnpm-debug.log*
+
+# Editor / sistema operativo
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
