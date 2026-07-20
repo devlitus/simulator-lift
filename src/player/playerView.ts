@@ -20,10 +20,18 @@ export class PlayerView {
     );
     root.position = new BABYLON.Vector3(0, 1.2, 12);
     root.isVisible = false;
+    // friction: 0 a propósito. Cannon 0.6.2 limita la fuerza de fricción a
+    // μ·m·g por contacto y la aplica como impulso por paso (sin escalar por
+    // dt), así que cada uno de los ~4 contactos con el suelo resta una
+    // cantidad fija de velocidad por eje en cada frame. Con fricción > 0 el
+    // jugador se mueve mucho más lento de lo configurado, y en diagonal peor
+    // aún (la resta es por eje: ~45% de la velocidad en recta). Como la
+    // velocidad se reasigna entera cada frame en update(), no hace falta
+    // fricción para frenar.
     root.physicsImpostor = new BABYLON.PhysicsImpostor(
       root,
       BABYLON.PhysicsImpostor.BoxImpostor,
-      { mass: 1, friction: 0.1, restitution: 0 },
+      { mass: 1, friction: 0, restitution: 0 },
       scene,
     );
     // Impide que el cuerpo gire por los choques (API del cuerpo de Cannon.js)
