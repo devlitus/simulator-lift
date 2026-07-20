@@ -66,6 +66,8 @@ export const FriendshipLevelsSchema = z.array(FriendshipLevelSchema).min(1);
 export const BalanceSchema = z.object({
   startMoney: z.number().int().min(0),
   startSeeds: z.record(z.number().int().min(0)), // semillas iniciales por tipo de cultivo
+  startFeed: z.number().int().min(0), // pienso inicial
+  startAnimals: z.array(z.string()), // especies con las que empieza el jugador
 });
 export type BalanceConfig = z.infer<typeof BalanceSchema>;
 
@@ -77,3 +79,34 @@ export const FarmConfigSchema = z.object({
   tileSize: z.number().positive(),
 });
 export type FarmConfig = z.infer<typeof FarmConfigSchema>;
+
+export const AnimalSchema = z.object({
+  name: z.string(),
+  icon: z.string(),
+  price: z.number().int().positive(), // precio de compra del animal
+  productName: z.string(), // lo que produce si se le alimenta (Huevo, Leche…)
+  productIcon: z.string(),
+  productPrice: z.number().int().positive(), // precio de venta del producto
+  color: z.string().regex(/^#[0-9a-fA-F]{6}$/), // color del cuerpo en la vista
+});
+export type AnimalDef = z.infer<typeof AnimalSchema>;
+export const AnimalsSchema = z.record(AnimalSchema);
+
+export const FeedSchema = z.object({
+  name: z.string(),
+  icon: z.string(),
+  price: z.number().int().positive(),
+});
+export type FeedDef = z.infer<typeof FeedSchema>;
+
+// Rectángulo del recinto de animales: la valla (worldView) y el paseo de los
+// animales (animalView) leen las mismas coordenadas para que nunca diverjan.
+export const PenConfigSchema = z.object({
+  x1: z.number(),
+  x2: z.number(),
+  z1: z.number(),
+  z2: z.number(),
+  gateZ1: z.number(), // hueco de la puerta en el lado este (entre gateZ1 y gateZ2)
+  gateZ2: z.number(),
+});
+export type PenConfig = z.infer<typeof PenConfigSchema>;

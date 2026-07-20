@@ -5,6 +5,7 @@
 // así que sus objetos se tipan como `any` en todas las vistas.
 import { CONFIG } from '../core/constants';
 import { EVENTS, EventBus } from '../core/events';
+import type { PenConfig } from '../../data/schemas';
 
 export class WorldView {
   scene: any;
@@ -13,11 +14,17 @@ export class WorldView {
   hemi: any;
   sun: any;
   shadow: any;
+  pen: PenConfig;
   sellBin: { x: number; z: number };
 
-  constructor(scene: any, bus: EventBus, { shadows = true }: { shadows?: boolean } = {}) {
+  constructor(
+    scene: any,
+    bus: EventBus,
+    { shadows = true, pen }: { shadows?: boolean; pen: PenConfig },
+  ) {
     this.scene = scene;
     this.bus = bus;
+    this.pen = pen;
     this.time = 0.08; // fracción del día transcurrida (0 = 06:00). Empieza ~08:00.
 
     scene.clearColor = new BABYLON.Color4(0.55, 0.78, 0.95, 1);
@@ -43,9 +50,10 @@ export class WorldView {
     this.buildBuildings();
     this.buildTrees();
     this.buildDecor();
+    this.buildPen();
 
     // Posición de la caja de ventas (main.ts la usa como interactuable)
-    this.sellBin = { x: 6, z: 5 };
+    this.sellBin = { x: 11.8, z: 5 };
   }
 
   addShadow(mesh: any): void {
@@ -249,13 +257,13 @@ export class WorldView {
     );
     this.addShadow(well);
 
-    // Caja de ventas junto a la granja
+    // Caja de ventas junto a la granja (al este de la parcela)
     const bin = BABYLON.MeshBuilder.CreateBox(
       'sellBin',
       { width: 1.4, height: 1, depth: 1.4 },
       this.scene,
     );
-    bin.position.set(6, 0.5, 5);
+    bin.position.set(11.8, 0.5, 5);
     bin.material = this.mat(0.6, 0.4, 0.2);
     bin.physicsImpostor = new BABYLON.PhysicsImpostor(
       bin,
@@ -269,7 +277,7 @@ export class WorldView {
       { width: 1.5, height: 0.12, depth: 1.5 },
       this.scene,
     );
-    lid.position.set(6, 1.06, 5);
+    lid.position.set(11.8, 1.06, 5);
     lid.material = this.mat(0.45, 0.3, 0.14);
 
     // Jardín de flores de Lila (decorativo)
@@ -292,6 +300,84 @@ export class WorldView {
       head.position.set(fx, 0.55, fz);
       head.material = flowerColors[i % 3];
     }
+  }
+
+  // Recinto de animales al oeste de la calle, frente a la parcela: suelo de
+  // paja y valla de madera con puerta hacia la calle. Las coordenadas vienen
+  // de data/animals.ts (PEN): los animales (animalView) pasean dentro del
+  // mismo rectángulo. Los animales ya no son decoración: los gestiona
+  // AnimalLogic/AnimalView.
+  buildPen(): void {
+    const { x1, x2, z1, z2, gateZ1, gateZ2 } = this.pen;
+
+    // Suelo de paja
+    const floor = BABYLON.MeshBuilder.CreateBox(
+      'penFloor',
+      { width: x2 - x1, height: 0.04, depth: z2 - z1 },
+      this.scene,
+    );
+    floor.position.set((x1 + x2) / 2, 0.02, (z1 + z2) / 2);
+    floor.material = this.mat(0.82, 0.72, 0.45);
+    floor.receiveShadows = true;
+
+    // Valla perimetral con puerta en el lado este (mirando a la calle)
+    const fenceMat = this.mat(0.5, 0.36, 0.2);
+    this.fenceSide(x1, z1, x2, z1, fenceMat); // norte
+    this.fenceSide(x1, z2, x2, z2, fenceMat); // sur
+    this.fenceSide(x1, z1, x1, z2, fenceMat); // oeste
+    this.fenceSide(x2, z1, x2, gateZ1, fenceMat); // este, tramo inferior
+    this.fenceSide(x2, gateZ2, x2, z2, fenceMat); // este, tramo superior (puerta entre ambos)
+  }
+
+  // Un lado de valla: postes cada ~1.9 unidades, dos travesaños
+  // horizontales y una pared invisible para la colisión del jugador.
+  fenceSide(x1: number, z1: number, x2: number, z2: number, fenceMat: any): void {
+    const dx = x2 - x1;
+    const dz = z2 - z1;
+    const len = Math.hypot(dx, dz);
+    const alongX = Math.abs(dx) > Math.abs(dz);
+    const cx = (x1 + x2) / 2;
+    const cz = (z1 + z2) / 2;
+
+    const n = Math.max(2, Math.round(len / 1.9) + 1);
+    for (let i = 0; i < n; i++) {
+      const t = i / (n - 1);
+      const post = BABYLON.MeshBuilder.CreateBox(
+        'fencePost',
+        { width: 0.16, height: 0.9, depth: 0.16 },
+        this.scene,
+      );
+      post.position.set(x1 + dx * t, 0.45, z1 + dz * t);
+      post.material = fenceMat;
+      this.addShadow(post);
+    }
+
+    for (const y of [0.35, 0.68]) {
+      const rail = BABYLON.MeshBuilder.CreateBox(
+        'fenceRail',
+        alongX
+          ? { width: len, height: 0.09, depth: 0.09 }
+          : { width: 0.09, height: 0.09, depth: len },
+        this.scene,
+      );
+      rail.position.set(cx, y, cz);
+      rail.material = fenceMat;
+      this.addShadow(rail);
+    }
+
+    const wall = BABYLON.MeshBuilder.CreateBox(
+      'fenceWall',
+      alongX ? { width: len, height: 1, depth: 0.2 } : { width: 0.2, height: 1, depth: len },
+      this.scene,
+    );
+    wall.position.set(cx, 0.5, cz);
+    wall.isVisible = false;
+    wall.physicsImpostor = new BABYLON.PhysicsImpostor(
+      wall,
+      BABYLON.PhysicsImpostor.BoxImpostor,
+      { mass: 0 },
+      this.scene,
+    );
   }
 
   // ---------- Ciclo día/noche ----------
