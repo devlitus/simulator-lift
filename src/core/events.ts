@@ -8,6 +8,7 @@ export const EVENTS = {
   DAY_NEW: 'day:new',
   FARM_CHANGED: 'farm:changed', // la parcela cambió (vista debe resincronizar)
   FARM_HARVESTED: 'farm:harvested',
+  ANIMALS_CHANGED: 'animals:changed', // los animales cambiaron (compra, comida, carga)
   INVENTORY_CHANGED: 'inventory:changed', // semillas/cosecha/regalos cambiaron
   MONEY_CHANGED: 'money:changed',
   FRIENDSHIP_ADD: 'friendship:add', // petición de sumar puntos
@@ -23,6 +24,7 @@ export type EventPayloads = {
   'day:new': { day: number };
   'farm:changed': void;
   'farm:harvested': { type: string };
+  'animals:changed': void;
   'inventory:changed': void;
   'money:changed': void;
   'friendship:add': { npcId: string; pts: number };

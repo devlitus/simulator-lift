@@ -23,7 +23,7 @@ pnpm format        # Prettier
 
 ## Arquitectura
 
-Regla central (ADR 0001): **la lógica de dominio no importa BABYLON nunca**. `farmLogic.ts`, `economy.ts`, `friendship.ts` y `questSystem.ts` son clases puras que operan sobre el estado y el bus, y son lo único que se testea con Vitest (tests colocados como `*.test.ts` junto al código). Los archivos `*View.ts` (farmView, npcView, playerView, worldView) contienen los meshes de Babylon y no llevan reglas de juego; se verifican a mano en el navegador (ADR 0006). Los objetos de Babylon se tipan como `any` (UMD sin tipos).
+Regla central (ADR 0001): **la lógica de dominio no importa BABYLON nunca**. `farmLogic.ts`, `animalLogic.ts`, `economy.ts`, `friendship.ts` y `questSystem.ts` son clases puras que operan sobre el estado y el bus, y son lo único que se testea con Vitest (tests colocados como `*.test.ts` junto al código). Los archivos `*View.ts` (farmView, animalView, npcView, playerView, worldView) contienen los meshes de Babylon y no llevan reglas de juego; se verifican a mano en el navegador (ADR 0006). Los objetos de Babylon se tipan como `any` (UMD sin tipos).
 
 Comunicación entre sistemas: `EventBus` (Observer) **tipado** — el mapa `EventPayloads` de `src/core/events.ts` asocia cada evento de `EVENTS` a su payload (ADR 0002). Los sistemas de dominio emiten eventos; vistas y UI se suscriben. El estado central (`GameState`, un objeto plano mutable) se define y construye en `src/core/store.ts` y se pasa por referencia a todos los sistemas; se descartó Zustand por no aportar sobre este patrón (ADR 0009).
 
@@ -33,7 +33,7 @@ Organización por dominio, no por tipo de archivo (ADR 0005): cada carpeta de `s
 
 ## Contenido vs. código
 
-Todo el contenido y balance del juego vive en `data/` como datos (ADR 0004): cultivos (`crops.ts`), NPCs con diálogos por nivel de amistad (`npcs.ts`), misiones (`quests.ts`), regalos, balance inicial, dimensiones de la parcela. Los esquemas Zod de todo ese contenido están en `data/schemas.ts`; los tipos (`CropDef`, `NpcDef`, `QuestDef`…) se derivan con `z.infer` y cada archivo de datos valida su contenido con `.parse()` al cargarse (falla en el arranque si el dato está mal). Para añadir un cultivo/NPC/misión/regalo se edita solo `data/` — los sistemas los recogen automáticamente. Los tipos de misión soportados son `talkAll`, `deliver` y `harvest`. Constantes técnicas del motor (velocidades, radios de interacción) van en `src/core/constants.ts`, no en `data/`.
+Todo el contenido y balance del juego vive en `data/` como datos (ADR 0004): cultivos (`crops.ts`), NPCs con diálogos por nivel de amistad (`npcs.ts`), misiones (`quests.ts`), regalos, animales y pienso (`animals.ts`, incluye el rectángulo del recinto `PEN`), balance inicial, dimensiones de la parcela. Los esquemas Zod de todo ese contenido están en `data/schemas.ts`; los tipos (`CropDef`, `NpcDef`, `QuestDef`, `AnimalDef`…) se derivan con `z.infer` y cada archivo de datos valida su contenido con `.parse()` al cargarse (falla en el arranque si el dato está mal). Para añadir un cultivo/NPC/misión/regalo/animal se edita solo `data/` — los sistemas los recogen automáticamente. Los tipos de misión soportados son `talkAll`, `deliver` y `harvest`. Constantes técnicas del motor (velocidades, radios de interacción) van en `src/core/constants.ts`, no en `data/`.
 
 ## Convenciones
 

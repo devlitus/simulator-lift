@@ -10,6 +10,7 @@ import type { Interaction } from './core/types';
 import { BALANCE } from '../data/balance';
 import { CROPS } from '../data/crops';
 import { FARM_CONFIG } from '../data/farm';
+import { ANIMALS, ANIMAL_FEED, PEN } from '../data/animals';
 import { GIFTS } from '../data/gifts';
 import { NPC_DEFS } from '../data/npcs';
 import { QUEST_DEFS } from '../data/quests';
@@ -18,6 +19,8 @@ import { WorldView } from './world/worldView';
 import { PlayerView } from './player/playerView';
 import { FarmLogic } from './crops/farmLogic';
 import { FarmView } from './crops/farmView';
+import { AnimalLogic } from './animals/animalLogic';
+import { AnimalView } from './animals/animalView';
 import { Economy } from './economy/economy';
 import { Friendship } from './npcs/friendship';
 import { NPCSystemView } from './npcs/npcView';
@@ -43,19 +46,32 @@ scene.enablePhysics(
 
 // ---------- Bus de eventos + estado central ----------
 const bus = new EventBus();
-const state = createInitialState(BALANCE, CROPS, GIFTS, NPC_DEFS);
+const state = createInitialState(BALANCE, CROPS, GIFTS, NPC_DEFS, ANIMALS);
 
 // ---------- Sistemas de dominio (sin Babylon) ----------
 const farmLogic = new FarmLogic(state, bus, CROPS, FARM_CONFIG.cols * FARM_CONFIG.rows);
-const economy = new Economy(state, bus, CROPS, GIFTS);
+const animalLogic = new AnimalLogic(state, bus, ANIMALS, BALANCE.startAnimals);
+const economy = new Economy(state, bus, CROPS, GIFTS, ANIMALS, ANIMAL_FEED);
 const friendship = new Friendship(state, bus, NPC_DEFS);
 const quests = new QuestSystem(state, bus, QUEST_DEFS);
 
 // ---------- Vistas Babylon + UI ----------
-const world = new WorldView(scene, bus, { shadows: !lowSpec });
+const world = new WorldView(scene, bus, { shadows: !lowSpec, pen: PEN });
 const player = new PlayerView(scene, world);
 const farmView = new FarmView(scene, state, bus, farmLogic, FARM_CONFIG, CROPS);
-const ui = new GameUI(bus, state, world, quests, economy, CROPS, GIFTS);
+const animalView = new AnimalView(scene, world, state, bus, animalLogic, ANIMALS, PEN);
+const ui = new GameUI(
+  bus,
+  state,
+  world,
+  quests,
+  economy,
+  animalLogic,
+  CROPS,
+  GIFTS,
+  ANIMALS,
+  ANIMAL_FEED,
+);
 const npcs = new NPCSystemView(scene, world, state, ui, quests, friendship, NPC_DEFS, CROPS);
 const saveRepo = new SaveRepository(window.localStorage);
 
@@ -78,13 +94,13 @@ function updateCamera(dt: number): void {
 
 // ---------- Guardado / carga ----------
 function saveGame(silent = false): void {
-  const data = buildSave(state, farmLogic, quests);
+  const data = buildSave(state, farmLogic, quests, animalLogic);
   if (saveRepo.save(data) && !silent) bus.emit(EVENTS.NOTIFY, '💾 Partida guardada');
 }
 
 function loadGame(): boolean {
   const data = saveRepo.load();
-  return applySave(data, state, farmLogic, quests);
+  return applySave(data, state, farmLogic, quests, animalLogic);
 }
 
 // ---------- Ciclo de día nuevo ----------
@@ -92,6 +108,7 @@ bus.on(EVENTS.DAY_NEW, ({ day }) => {
   state.day = day;
   state.talkedToday = {};
   farmLogic.newDay();
+  animalLogic.newDay();
   bus.emit(EVENTS.NOTIFY, `🌅 Comienza el día ${state.day}`);
   saveGame(true);
   bus.emit(EVENTS.NOTIFY, '💾 Autoguardado');
@@ -105,6 +122,9 @@ function findInteraction(): Interaction | null {
   const f = farmView.getInteraction(p);
   if (f) candidates.push(f);
 
+  const a = animalView.getInteraction(p);
+  if (a) candidates.push(a);
+
   const n = npcs.getInteraction(p);
   if (n) candidates.push(n);
 
@@ -113,12 +133,12 @@ function findInteraction(): Interaction | null {
   if (dBin < CONFIG.interactionRadius) {
     candidates.push({
       dist: dBin,
-      label: 'E: Vender toda la cosecha',
+      label: 'E: Vender cosecha y productos de granja',
       action: () => {
         const total = economy.sellAllProduce();
         bus.emit(
           EVENTS.NOTIFY,
-          total > 0 ? `💰 Vendiste la cosecha por ${total} 🪙` : '🧺 No tienes cosecha para vender',
+          total > 0 ? `💰 Vendiste la cosecha por ${total} 🪙` : '🧺 No tienes nada para vender',
         );
       },
     });
@@ -189,6 +209,7 @@ engine.runRenderLoop(() => {
   const canMove = !ui.modalOpen;
   player.update(dt, keys, canMove);
   npcs.update(dt);
+  animalView.update(dt);
   updateCamera(dt);
 
   currentInteraction = canMove ? findInteraction() : null;

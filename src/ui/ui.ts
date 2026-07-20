@@ -9,7 +9,8 @@ import type { GameState } from '../core/store';
 import type { WorldView } from '../world/worldView';
 import type { QuestSystem, Quest } from '../quests/questSystem';
 import type { Economy } from '../economy/economy';
-import type { CropDef, GiftDef } from '../../data/schemas';
+import type { AnimalLogic } from '../animals/animalLogic';
+import type { AnimalDef, CropDef, FeedDef, GiftDef } from '../../data/schemas';
 import type { DialogButton } from '../core/types';
 
 // Los elementos del HUD existen siempre en index.html: el ! es seguro aquí
@@ -21,8 +22,11 @@ export class GameUI {
   world: WorldView;
   quests: QuestSystem;
   economy: Economy;
+  animalLogic: AnimalLogic;
   crops: Record<string, CropDef>;
   gifts: Record<string, GiftDef>;
+  animals: Record<string, AnimalDef>;
+  feedDef: FeedDef;
   el: Record<string, HTMLElement>;
 
   constructor(
@@ -31,16 +35,22 @@ export class GameUI {
     world: WorldView,
     quests: QuestSystem,
     economy: Economy,
+    animalLogic: AnimalLogic,
     cropsData: Record<string, CropDef>,
     giftsData: Record<string, GiftDef>,
+    animalsData: Record<string, AnimalDef>,
+    feedDef: FeedDef,
   ) {
     this.bus = bus;
     this.state = state;
     this.world = world;
     this.quests = quests;
     this.economy = economy;
+    this.animalLogic = animalLogic;
     this.crops = cropsData;
     this.gifts = giftsData;
+    this.animals = animalsData;
+    this.feedDef = feedDef;
 
     this.el = {
       money: $('hud-money'),
@@ -80,6 +90,7 @@ export class GameUI {
       refreshShopIfOpen();
     });
     bus.on(EVENTS.MONEY_CHANGED, refreshShopIfOpen);
+    bus.on(EVENTS.ANIMALS_CHANGED, refreshShopIfOpen);
     bus.on(EVENTS.QUEST_CHANGED, () => this.renderQuests());
 
     this.renderInventory();
@@ -122,6 +133,18 @@ export class GameUI {
     Object.keys(this.crops).forEach((key) => {
       const empty = s.produce[key] === 0 ? ' empty' : '';
       parts.push(`<span class="item${empty}">${this.crops[key].icon}×${s.produce[key]}</span>`);
+    });
+    parts.push('</span>');
+
+    parts.push('<span class="inv-label">Granja</span>');
+    parts.push('<span class="inv-section">');
+    const noFeed = s.feed === 0 ? ' empty' : '';
+    parts.push(`<span class="item${noFeed}">${this.feedDef.icon}×${s.feed}</span>`);
+    Object.keys(this.animals).forEach((key) => {
+      const empty = s.animalProducts[key] === 0 ? ' empty' : '';
+      parts.push(
+        `<span class="item${empty}">${this.animals[key].productIcon}×${s.animalProducts[key]}</span>`,
+      );
     });
     parts.push('</span>');
 
@@ -249,6 +272,27 @@ export class GameUI {
           `tienes ${s.gifts[key]}`,
           s.money >= g.price,
           () => this.economy.buyGift(key),
+        ),
+      );
+    }
+    rows.push(
+      this.shopRow(
+        `${this.feedDef.icon} ${this.feedDef.name} — alimenta a 1 animal durante 1 día`,
+        `${this.feedDef.price} 🪙`,
+        `tienes ${s.feed}`,
+        s.money >= this.feedDef.price,
+        () => this.economy.buyFeed(),
+      ),
+    );
+    for (const key of Object.keys(this.animals)) {
+      const a = this.animals[key];
+      rows.push(
+        this.shopRow(
+          `${a.icon} ${a.name} — si la alimentas, deja ${a.productName} (${a.productPrice}🪙) cada día`,
+          `${a.price} 🪙`,
+          `tienes ${this.animalLogic.countOf(key)}`,
+          s.money >= a.price,
+          () => this.animalLogic.buyAnimal(key),
         ),
       );
     }
