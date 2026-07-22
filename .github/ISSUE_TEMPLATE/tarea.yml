@@ -1,0 +1,87 @@
+name: Tarea
+description: Plantilla estándar para cualquier issue del proyecto (feature, mejora, refactor o bug)
+title: ""
+labels: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Antes de escribir
+
+        - **Título**: en imperativo, corto y concreto. Describe qué se hace y dónde.
+          Ejemplo: `Añadir escenario de regalos para el sistema de amistad`.
+        - **Una issue = un objetivo.** Si hay dos objetivos independientes, son dos issues.
+        - Los criterios de aceptación deben poder **verificarse de forma objetiva**
+          (un comando que pasa, un escenario en verde, un comportamiento observable en el navegador).
+
+  - type: textarea
+    id: objetivo
+    attributes:
+      label: Objetivo
+      description: Qué hay que conseguir y por qué. Describe el resultado final observable, no los pasos.
+      placeholder: |
+        Ej.: El jugador puede vender leche y huevos en el mercado para que
+        los animales generen ingresos y el ciclo económico se cierre.
+    validations:
+      required: true
+
+  - type: textarea
+    id: criterios
+    attributes:
+      label: Criterios de aceptación
+      description: |
+        Checklist de condiciones que demuestran que el objetivo se cumple.
+        Cada criterio debe ser verificable: indica el comando, el escenario o el comportamiento que lo comprueba.
+      placeholder: |
+        - [ ] `pnpm verify` pasa (format:check + lint + typecheck + test)
+        - [ ] Existe el escenario `src/scenarios/venderProductos.test.ts` y pasa
+        - [ ] En el navegador: al interactuar con el mercado con leche en el inventario, el oro aumenta
+    validations:
+      required: true
+
+  - type: textarea
+    id: tests
+    attributes:
+      label: Tests necesarios
+      description: |
+        Tests unitarios (`*.test.ts` junto al código de dominio) y/o escenario de aceptación
+        (`src/scenarios/`) que hay que añadir o modificar. Las vistas (`*View.ts`) se verifican
+        a mano en el navegador y no llevan tests. Escribe `N/A` si no aplica.
+      placeholder: |
+        Ej.:
+        - Unitario: `economy.test.ts` cubre vender producto con y sin stock
+        - Escenario: `src/scenarios/venderProductos.test.ts` recorre el ciclo completo
+    validations:
+      required: false
+
+  - type: textarea
+    id: contexto
+    attributes:
+      label: Contexto
+      description: Estado actual, datos relevantes, salidas de comandos, enlaces a ADRs o issues relacionadas.
+      placeholder: |
+        Ej.: Actualmente los productos animales se acumulan en el inventario sin
+        forma de venderse (ver `data/balance.ts`). Relacionada: #6
+    validations:
+      required: false
+
+  - type: textarea
+    id: fuera_de_alcance
+    attributes:
+      label: Fuera de alcance
+      description: Qué NO entra en esta issue aunque esté relacionado (para evitar que crezca).
+      placeholder: |
+        Ej.: No incluye precios dinámicos ni ofertas diarias del mercado.
+    validations:
+      required: false
+
+  - type: textarea
+    id: notas
+    attributes:
+      label: Notas de implementación
+      description: Enfoque sugerido, riesgos, decisiones a tomar. Opcional.
+      placeholder: |
+        Ej.: Añadir `sellPrice` a los productos en `data/animals.ts` y reutilizar
+        la lógica de venta de cultivos de `src/economy/`.
+    validations:
+      required: false
