@@ -19,6 +19,7 @@ pnpm vitest run src/crops/farmLogic.test.ts   # un solo archivo de test
 pnpm lint          # ESLint (flat config + typescript-eslint, reglas mínimas)
 pnpm typecheck     # tsc --noEmit (strict) sobre src/ y data/
 pnpm format        # Prettier
+pnpm verify        # gate completo: format:check + lint + typecheck + test
 ```
 
 ## Arquitectura
