@@ -14,7 +14,10 @@
 .playwright-mcp/
 .claude/settings.local.json
 .claude/scheduled_tasks.lock
-.kimi-code/
+.kimi-code/*
+# El estado de tareas a medias y los skills sí se versionan (memoria y workflow entre sesiones)
+!.kimi-code/state/
+!.kimi-code/skills/
 
 # Logs y temporales
 *.log

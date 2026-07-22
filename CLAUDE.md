@@ -39,6 +39,7 @@ Todo el contenido y balance del juego vive en `data/` como datos (ADR 0004): cul
 ## Convenciones
 
 - Las decisiones de arquitectura se registran como ADR en `docs/adr/`; si cambias algo estructural, añade o actualiza un ADR.
+- El estado de tareas a medias (issues) vive en `.kimi-code/state/`, un archivo por issue; se actualiza con el skill `pausar` al dejar trabajo a medias, se consulta con `retomar`, y se borra cuando la tarea se completa.
 - TypeScript `strict`; los tipos de contenido salen de los esquemas Zod (una sola fuente de verdad).
 - `public/` y `dist/` están fuera de lint/format.
 - `assets/` está reservado para modelos/texturas futuros (vacío en v1).
