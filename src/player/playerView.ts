@@ -8,6 +8,7 @@ export class PlayerView {
   root: any;
   visual: any;
   private _vel: any;
+  private _primitives: any[];
 
   constructor(scene: any, world: WorldView) {
     this.scene = scene;
@@ -72,7 +73,38 @@ export class PlayerView {
     hat.material = mat(0.75, 0.6, 0.3);
     world.addShadow(hat);
 
+    this._primitives = [body, head, hat];
     this._vel = new BABYLON.Vector3(); // scratch reutilizado en update()
+
+    // Si carga el modelo GLB del granjero, sustituye a las primitivas
+    this._loadFarmer(world);
+  }
+
+  // Carga el modelo 3D del granjero (assets/granjero.glb, publicado en
+  // /models/). Si falla (sin red, asset ausente, loaders no cargados) el
+  // avatar se queda con las primitivas de siempre.
+  private async _loadFarmer(world: WorldView): Promise<void> {
+    try {
+      const res = await BABYLON.SceneLoader.ImportMeshAsync(
+        '',
+        '/models/',
+        'granjero.glb',
+        this.scene,
+      );
+      const model = res.meshes[0];
+      // El modelo mide 1.84 m con los pies en y = -0.87; el avatar de
+      // primitivas mide ~1.3 m, así que se escala y se apoya en el suelo
+      const escala = 1.3 / 1.84;
+      model.parent = this.visual;
+      model.scaling = new BABYLON.Vector3(escala, escala, escala);
+      model.position.y = 0.87 * escala;
+      for (const m of res.meshes) {
+        if (m.getTotalVertices() > 0) world.addShadow(m);
+      }
+      for (const p of this._primitives) p.dispose();
+    } catch {
+      // fallback: se quedan las primitivas
+    }
   }
 
   get position(): any {

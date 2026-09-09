@@ -1,6 +1,6 @@
 name: Tarea
 description: Plantilla estándar para cualquier issue del proyecto (feature, mejora, refactor o bug)
-title: ""
+title: ''
 labels: []
 body:
   - type: markdown

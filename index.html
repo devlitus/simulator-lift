@@ -89,9 +89,12 @@
       </div>
     </div>
 
-    <!-- Babylon.js 9.17.0 + motor de física Cannon.js 0.6.2, servidos en local (sin CDN).
-         Van como UMD en public/: Vite los copia tal cual y no los empaqueta. -->
+    <!-- Babylon.js 9.17.0 + loaders glTF + motor de física Cannon.js 0.6.2, servidos en
+         local (sin CDN). Van como UMD en public/: Vite los copia tal cual y no los empaqueta.
+         babylon.loaders.js se genera desde @babylonjs/loaders@9.17.0 con esbuild (Babylon 9
+         ya no publica UMD propio) y se engancha al BABYLON global del core. -->
     <script src="/vendor/babylon.js"></script>
+    <script src="/vendor/babylon.loaders.js"></script>
     <script src="/vendor/cannon.js"></script>
     <script type="module" src="/src/main.ts"></script>
   </body>
