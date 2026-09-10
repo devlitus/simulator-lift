@@ -45,3 +45,4 @@ Todo el contenido y balance del juego vive en `data/` como datos (ADR 0004): cul
 - TypeScript `strict`; los tipos de contenido salen de los esquemas Zod (una sola fuente de verdad).
 - `public/` y `dist/` están fuera de lint/format.
 - `assets/` contiene los modelos fuente (p. ej. `granjero.glb`, el avatar del jugador); la copia que sirve el juego está en `public/models/` y el cargador glTF en `public/vendor/babylon.loaders.js` (ver `assets/README.md`).
+Por cada nueva feature crear una rama dedicada y un plan en `docs/plans/` y no mezcles cambios de varias issues en la misma rama.
