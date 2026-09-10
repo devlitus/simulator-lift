@@ -29,6 +29,7 @@ export class AnimalView {
   pen: PenConfig;
   visuals: Map<Animal, AnimalVisual>;
   mats: Record<string, any>;
+  modelCache: Record<string, Promise<any>>;
 
   constructor(
     scene: any,
@@ -47,6 +48,7 @@ export class AnimalView {
     this.pen = pen;
     this.visuals = new Map();
     this.mats = {};
+    this.modelCache = {};
 
     this.syncMeshes();
     bus.on(EVENTS.ANIMALS_CHANGED, () => this.syncMeshes());
@@ -264,6 +266,37 @@ export class AnimalView {
     comb.parent = root;
     comb.position.set(0.16, 0.52, 0);
     comb.material = this.mat('#d93333');
+    this.loadModel(root, 'gallina.glb', [body, head, beak, comb]);
     return root;
+  }
+
+  // Carga el modelo 3D de una especie (assets/models/, publicado en /models/)
+  // y, si tiene éxito, sustituye las primitivas. Si falla (asset ausente,
+  // loaders no cargados) el animal se queda con las primitivas de siempre.
+  // El .glb se descarga y parsea una sola vez por especie: el original queda
+  // desactivado como plantilla y cada animal es una instancia de su jerarquía.
+  // Convención del modelo: pies en y=0, mirando hacia +x (ver update()).
+  private async loadModel(root: any, file: string, primitives: any[]): Promise<void> {
+    try {
+      this.modelCache[file] ??= BABYLON.SceneLoader.ImportMeshAsync(
+        '',
+        '/models/',
+        file,
+        this.scene,
+      ).then((res: any) => {
+        res.meshes[0].setEnabled(false);
+        return res.meshes[0];
+      });
+      const template = await this.modelCache[file];
+      const model = template.instantiateHierarchy();
+      model.parent = root;
+      model.setEnabled(true);
+      for (const m of model.getChildMeshes()) {
+        if (m.getTotalVertices() > 0) this.world.addShadow(m);
+      }
+      for (const p of primitives) p.dispose();
+    } catch {
+      // fallback: se quedan las primitivas
+    }
   }
 }

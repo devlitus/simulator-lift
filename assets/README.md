@@ -9,6 +9,12 @@ Contenido binario del juego: modelos `.glb`, texturas y audio.
   con la que se generó la geometría). Fuente editable: `~/blender-mcp/granjero.blend`.
 - `granjero_original.glb` — copia del modelo original sin texturizar ni recortar
   la peana (respaldo).
+- `models/gallina.glb` — modelo 3D de la gallina, mismo pipeline: imagen de
+  referencia `gallina_00001_.png` (Z-Image Turbo en ComfyUI), malla
+  `models/gallina_original.glb` (Hunyuan3D 2.0 en ComfyUI) y acabado en Blender
+  (peana recortada, colores planos, orientada hacia +x con los pies en y=0,
+  0.55 unidades de alto). Fuente editable: `~/blender-mcp/gallina.blend`
+  (script: `~/blender-mcp/gallina_finish.py`).
 
 ## Cómo se publican los modelos
 
