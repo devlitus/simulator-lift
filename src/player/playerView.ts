@@ -94,12 +94,14 @@ export class PlayerView {
         this.scene,
       );
       const model = res.meshes[0];
-      // El modelo mide 1.84 m con los pies en y = -0.87; el avatar de
-      // primitivas mide ~1.3 m, así que se escala y se apoya en el suelo
-      const escala = 1.3 / 1.84;
+      // Se escala a la altura del avatar de primitivas (~1.3 m) y se apoya
+      // en el suelo a partir de la caja envolvente real del modelo, así el
+      // código no depende de las medidas de cada .glb
+      const { min, max } = model.getHierarchyBoundingVectors(true);
+      const escala = 1.3 / (max.y - min.y);
       model.parent = this.visual;
       model.scaling = new BABYLON.Vector3(escala, escala, escala);
-      model.position.y = 0.87 * escala;
+      model.position.y = -min.y * escala;
       for (const m of res.meshes) {
         if (m.getTotalVertices() > 0) world.addShadow(m);
       }
