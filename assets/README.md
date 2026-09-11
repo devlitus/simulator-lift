@@ -4,16 +4,19 @@ Contenido binario del juego: modelos `.glb`, texturas y audio.
 
 ## Estado actual
 
-- `granjero.glb` — modelo 3D del jugador con rig y animaciones, texturizado con
-  materiales de colores planos (sin texturas) a partir de `granjero_00001_.png`
-  (imagen de referencia con la que se generó la geometría). Fuente editable:
-  `~/blender-mcp/granjero.blend`. Es el respaldo rigado: el que sirve el juego
-  en `public/models/granjero.glb` es hoy `granjero_texturizado.glb`.
+- `granjero.glb` — modelo 3D del jugador texturizado con materiales de
+  colores planos (sin texturas) a partir de `granjero_00001_.png` (imagen de
+  referencia con la que se generó la geometría). Respaldo SIN rig ni
+  animaciones. Fuente editable: `~/blender-mcp/granjero.blend`.
 - `granjero_texturizado.glb` — modelo del jugador generado con Hunyuan3D-2
   (servidor local, imagen→3D con textura) a partir de `granjero_00001_.png`,
-  con atlas de textura de 2048×2048 y sin rig ni animaciones. Limpio de
-  artefactos (vértices soldados e islas eliminadas). Fuente editable:
-  `assets/granjero_texturizado.blend`.
+  con atlas de textura de 2048×2048. Limpio de artefactos (vértices soldados
+  e islas eliminadas) y CON rig propio de 19 huesos y animaciones `walk`
+  (ciclo de caminata humana, 1 s) e `idle` (respiración, 2 s), exportadas
+  como pistas NLA. Es el que sirve el juego en `public/models/granjero.glb`.
+  Fuente editable: `assets/granjero_texturizado.blend`. Scripts del rig y
+  las animaciones: `~/blender-mcp/granjero/` (walk.py, idle.py, exportar.py;
+  enviados a Blender con `~/blender-mcp/bcmd.py`).
 - `granjero_original.glb` — copia del modelo original sin texturizar ni recortar
   la peana (respaldo).
 - `models/gallina.glb` — modelo 3D de la gallina: asset
