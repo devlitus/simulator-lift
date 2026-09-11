@@ -47,6 +47,9 @@ export class PlayerView {
     this.visual = new BABYLON.TransformNode('playerVisual', scene);
     this.visual.parent = root;
     this.visual.position.y = -0.65; // origen a los pies del personaje
+    // Orientación inicial: mirando hacia -z (el camino y la granja quedan
+    // al norte del spawn). Con 0 aparecería de espaldas al camino.
+    this.visual.rotation.y = Math.PI;
 
     const mat = (r: number, g: number, b: number) => {
       const m = new BABYLON.StandardMaterial('pmat', scene);
