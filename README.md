@@ -27,6 +27,7 @@ pnpm dev
 Abre http://localhost:5173 y listo. No hace falta conexión: todo lo necesario va incluido en el proyecto.
 
 - **WASD / Flechas** — moverte
+- **Rueda del ratón** — zoom de la cámara
 - **E** — interactuar (plantar, regar, cosechar, alimentar, hablar, vender)
 - **1 / 2 / 3** — elegir semilla
 - **H** — ayuda · **Esc** — cerrar ventanas

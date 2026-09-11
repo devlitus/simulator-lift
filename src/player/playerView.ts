@@ -1,5 +1,6 @@
 // PlayerView (vista Babylon): avatar del jugador con física (impostor de caja)
-// y movimiento WASD. Sin reglas de juego: solo traduce input a velocidad.
+// y movimiento con WASD / flechas. Sin reglas de juego: solo traduce input a
+// velocidad.
 import { CONFIG } from '../core/constants';
 import type { WorldView } from '../world/worldView';
 
@@ -143,31 +144,24 @@ export class PlayerView {
     return this.root.position;
   }
 
-  // Hacia dónde mira el personaje (radianes, convención rotation.y)
-  get facingYaw(): number {
-    return this.visual.rotation.y;
-  }
-
-  // camYaw: rumbo de la cámara en el plano XZ. Los controles son relativos
-  // a ella: W = alejarse de la cámara, D = derecha de la cámara. Con
-  // camYaw = π reproduce los controles fijos al mundo originales.
-  update(dt: number, keys: Record<string, boolean>, canMove: boolean, camYaw = 0): void {
+  // La cámara es fija (mira hacia -z desde +z), así que el input se mapea
+  // directo al mundo: W/arriba = -z (alejarse, arriba en pantalla),
+  // D/derecha = -x (derecha en pantalla).
+  update(dt: number, keys: Record<string, boolean>, canMove: boolean): void {
     let ix = 0;
     let iz = 0;
     if (canMove) {
-      if (keys['w'] || keys['arrowup']) iz += 1;
-      if (keys['s'] || keys['arrowdown']) iz -= 1;
-      if (keys['a'] || keys['arrowleft']) ix -= 1;
-      if (keys['d'] || keys['arrowright']) ix += 1;
+      if (keys['w'] || keys['arrowup']) iz -= 1;
+      if (keys['s'] || keys['arrowdown']) iz += 1;
+      if (keys['a'] || keys['arrowleft']) ix += 1;
+      if (keys['d'] || keys['arrowright']) ix -= 1;
     }
     if (ix !== 0 && iz !== 0) {
       ix *= Math.SQRT1_2;
       iz *= Math.SQRT1_2;
     }
-    const sin = Math.sin(camYaw);
-    const cos = Math.cos(camYaw);
-    const dx = ix * cos + iz * sin;
-    const dz = -ix * sin + iz * cos;
+    const dx = ix;
+    const dz = iz;
 
     const imp = this.root.physicsImpostor;
     const v = imp.getLinearVelocity();

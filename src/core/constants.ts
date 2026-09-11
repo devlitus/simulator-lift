@@ -5,4 +5,7 @@ export const CONFIG = {
   playerSpeed: 5.5, // velocidad de movimiento del jugador
   interactionRadius: 2.4, // distancia máxima para interactuar con NPCs / objetos
   tileRadius: 1.6, // distancia máxima para interactuar con un surco
+  camZoomStart: 12, // distancia inicial cámara↔jugador
+  camZoomMin: 6,
+  camZoomMax: 30,
 } as const;

@@ -75,36 +75,34 @@ const ui = new GameUI(
 const npcs = new NPCSystemView(scene, world, state, ui, quests, friendship, NPC_DEFS, CROPS);
 const saveRepo = new SaveRepository(window.localStorage);
 
-// ---------- Cámara en tercera persona: 45° por detrás del personaje ----------
-// Distancia horizontal y altura iguales → ángulo de 45°. El rumbo gira con
-// suavizado hacia la espalda del personaje (facingYaw solo cambia al moverse,
-// así que parado la cámara queda quieta).
-const CAM_DIST = 7;
-let camYaw = Math.PI; // empieza mirando hacia -z, como la vista original
-const camera = new BABYLON.FreeCamera(
-  'cam',
-  new BABYLON.Vector3(0, 1 + CAM_DIST, 12 + CAM_DIST),
-  scene,
-);
-const camTargetPos = new BABYLON.Vector3();
-const camLookAt = new BABYLON.Vector3();
+// ---------- Cámara de seguimiento estilo Stardew ----------
+// Vista aérea con orientación fija (pitch 45°, mirando hacia -z): la cámara
+// sigue al personaje centrada, con suavizado exponencial, y nunca gira.
+// La rueda del ratón ajusta el zoom (acercar/alejar manteniendo el ángulo).
+const camera = new BABYLON.FreeCamera('cam', new BABYLON.Vector3(0, 12, 24), scene);
+const camTarget = new BABYLON.Vector3(0, 0, 12); // punto de mira, arranca en el jugador
+const camLookAt = new BABYLON.Vector3(0, 1, 12); // scratch para setTarget
+let camZoom: number = CONFIG.camZoomStart;
+
+canvas.addEventListener('wheel', (e) => {
+  e.preventDefault();
+  camZoom = Math.min(
+    CONFIG.camZoomMax,
+    Math.max(CONFIG.camZoomMin, camZoom + Math.sign(e.deltaY) * 1.5),
+  );
+});
 
 function updateCamera(dt: number): void {
   const p = player.position;
-  // Giro por el arco más corto, con suavizado exponencial (≈4/s)
-  let diff = (player.facingYaw - camYaw) % (2 * Math.PI);
-  if (diff > Math.PI) diff -= 2 * Math.PI;
-  if (diff < -Math.PI) diff += 2 * Math.PI;
-  camYaw += diff * (1 - Math.exp(-4 * dt));
-  camTargetPos.set(
-    p.x - Math.sin(camYaw) * CAM_DIST,
-    p.y + CAM_DIST,
-    p.z - Math.cos(camYaw) * CAM_DIST,
-  );
-  // Suavizado de posición independiente del framerate (≈0.08/frame a 60 fps)
+  // Suavizado de posición independiente del framerate (≈5/s)
   const alpha = 1 - Math.exp(-5 * dt);
-  BABYLON.Vector3.LerpToRef(camera.position, camTargetPos, alpha, camera.position);
-  camLookAt.set(p.x, p.y + 1, p.z);
+  camTarget.x += (p.x - camTarget.x) * alpha;
+  camTarget.z += (p.z - camTarget.z) * alpha;
+
+  // Altura = distancia → pitch de 45°. Mirar al objetivo suavizado (no al
+  // jugador directo) mantiene la orientación exactamente fija.
+  camera.position.set(camTarget.x, camZoom, camTarget.z + camZoom);
+  camLookAt.set(camTarget.x, 1, camTarget.z);
   camera.setTarget(camLookAt);
 }
 
@@ -223,7 +221,7 @@ engine.runRenderLoop(() => {
   world.update(dt, state.day);
 
   const canMove = !ui.modalOpen;
-  player.update(dt, keys, canMove, camYaw);
+  player.update(dt, keys, canMove);
   npcs.update(dt);
   animalView.update(dt);
   updateCamera(dt);
