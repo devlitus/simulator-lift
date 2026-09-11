@@ -9,6 +9,8 @@ export class PlayerView {
   visual: any;
   private _vel: any;
   private _primitives: any[];
+  private _anims: { walk?: any; idle?: any } = {};
+  private _animActual: string | null = null;
 
   constructor(scene: any, world: WorldView) {
     this.scene = scene;
@@ -101,10 +103,38 @@ export class PlayerView {
       for (const m of res.meshes) {
         if (m.getTotalVertices() > 0) world.addShadow(m);
       }
+      this._cargarAnimaciones(res.animationGroups ?? []);
       for (const p of this._primitives) p.dispose();
     } catch {
       // fallback: se quedan las primitivas
     }
+  }
+
+  // Recoge los grupos de animación del GLB (walk/idle, exportados desde
+  // Blender como pistas NLA) y arranca el idle en bucle. Si el modelo no
+  // trae animaciones, el avatar se mueve sin animar, como antes.
+  private _cargarAnimaciones(grupos: any[]): void {
+    for (const g of grupos) {
+      const nombre = (g.name ?? '').toLowerCase();
+      if (nombre.includes('walk')) this._anims.walk = g;
+      else if (nombre.includes('idle')) this._anims.idle = g;
+      g.stop();
+    }
+    if (this._anims.idle) {
+      this._anims.idle.start(true);
+      this._animActual = 'idle';
+    }
+  }
+
+  // Alterna walk/idle según se mueva; sin transiciones (estilo cartoon).
+  private _animar(moviendo: boolean): void {
+    const siguiente = moviendo ? 'walk' : 'idle';
+    if (siguiente === this._animActual) return;
+    const grupo = this._anims[siguiente];
+    if (!grupo) return;
+    if (this._animActual) this._anims[this._animActual as 'walk' | 'idle']?.stop();
+    grupo.start(true);
+    this._animActual = siguiente;
   }
 
   get position(): any {
@@ -133,6 +163,7 @@ export class PlayerView {
     if (dx !== 0 || dz !== 0) {
       this.visual.rotation.y = Math.atan2(dx, dz);
     }
+    this._animar(dx !== 0 || dz !== 0);
 
     // Red de seguridad: si algo raro lo lanza fuera del mundo, reaparece
     if (this.root.position.y < -2) {
