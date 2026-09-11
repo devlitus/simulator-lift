@@ -143,19 +143,31 @@ export class PlayerView {
     return this.root.position;
   }
 
-  update(dt: number, keys: Record<string, boolean>, canMove: boolean): void {
-    let dx = 0;
-    let dz = 0;
+  // Hacia dónde mira el personaje (radianes, convención rotation.y)
+  get facingYaw(): number {
+    return this.visual.rotation.y;
+  }
+
+  // camYaw: rumbo de la cámara en el plano XZ. Los controles son relativos
+  // a ella: W = alejarse de la cámara, D = derecha de la cámara. Con
+  // camYaw = π reproduce los controles fijos al mundo originales.
+  update(dt: number, keys: Record<string, boolean>, canMove: boolean, camYaw = 0): void {
+    let ix = 0;
+    let iz = 0;
     if (canMove) {
-      if (keys['w'] || keys['arrowup']) dz -= 1;
-      if (keys['s'] || keys['arrowdown']) dz += 1;
-      if (keys['a'] || keys['arrowleft']) dx += 1;
-      if (keys['d'] || keys['arrowright']) dx -= 1;
+      if (keys['w'] || keys['arrowup']) iz += 1;
+      if (keys['s'] || keys['arrowdown']) iz -= 1;
+      if (keys['a'] || keys['arrowleft']) ix -= 1;
+      if (keys['d'] || keys['arrowright']) ix += 1;
     }
-    if (dx !== 0 && dz !== 0) {
-      dx *= Math.SQRT1_2;
-      dz *= Math.SQRT1_2;
+    if (ix !== 0 && iz !== 0) {
+      ix *= Math.SQRT1_2;
+      iz *= Math.SQRT1_2;
     }
+    const sin = Math.sin(camYaw);
+    const cos = Math.cos(camYaw);
+    const dx = ix * cos + iz * sin;
+    const dz = -ix * sin + iz * cos;
 
     const imp = this.root.physicsImpostor;
     const v = imp.getLinearVelocity();

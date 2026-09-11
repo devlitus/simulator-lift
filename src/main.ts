@@ -75,20 +75,36 @@ const ui = new GameUI(
 const npcs = new NPCSystemView(scene, world, state, ui, quests, friendship, NPC_DEFS, CROPS);
 const saveRepo = new SaveRepository(window.localStorage);
 
-// ---------- Cámara isométrica con seguimiento suave ----------
-const camera = new BABYLON.FreeCamera('cam', new BABYLON.Vector3(0, 16, 22), scene);
-camera.setTarget(new BABYLON.Vector3(0, 0, 12));
-const CAM_OFFSET = new BABYLON.Vector3(0, 16, 10);
+// ---------- Cámara en tercera persona: 45° por detrás del personaje ----------
+// Distancia horizontal y altura iguales → ángulo de 45°. El rumbo gira con
+// suavizado hacia la espalda del personaje (facingYaw solo cambia al moverse,
+// así que parado la cámara queda quieta).
+const CAM_DIST = 7;
+let camYaw = Math.PI; // empieza mirando hacia -z, como la vista original
+const camera = new BABYLON.FreeCamera(
+  'cam',
+  new BABYLON.Vector3(0, 1 + CAM_DIST, 12 + CAM_DIST),
+  scene,
+);
 const camTargetPos = new BABYLON.Vector3();
 const camLookAt = new BABYLON.Vector3();
 
 function updateCamera(dt: number): void {
   const p = player.position;
-  camTargetPos.set(p.x + CAM_OFFSET.x, CAM_OFFSET.y, p.z + CAM_OFFSET.z);
-  // Suavizado exponencial independiente del framerate (≈0.08/frame a 60 fps)
+  // Giro por el arco más corto, con suavizado exponencial (≈4/s)
+  let diff = (player.facingYaw - camYaw) % (2 * Math.PI);
+  if (diff > Math.PI) diff -= 2 * Math.PI;
+  if (diff < -Math.PI) diff += 2 * Math.PI;
+  camYaw += diff * (1 - Math.exp(-4 * dt));
+  camTargetPos.set(
+    p.x - Math.sin(camYaw) * CAM_DIST,
+    p.y + CAM_DIST,
+    p.z - Math.cos(camYaw) * CAM_DIST,
+  );
+  // Suavizado de posición independiente del framerate (≈0.08/frame a 60 fps)
   const alpha = 1 - Math.exp(-5 * dt);
   BABYLON.Vector3.LerpToRef(camera.position, camTargetPos, alpha, camera.position);
-  camLookAt.set(p.x, 0.5, p.z);
+  camLookAt.set(p.x, p.y + 1, p.z);
   camera.setTarget(camLookAt);
 }
 
@@ -207,7 +223,7 @@ engine.runRenderLoop(() => {
   world.update(dt, state.day);
 
   const canMove = !ui.modalOpen;
-  player.update(dt, keys, canMove);
+  player.update(dt, keys, canMove, camYaw);
   npcs.update(dt);
   animalView.update(dt);
   updateCamera(dt);
