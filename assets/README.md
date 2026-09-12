@@ -25,6 +25,13 @@ Contenido binario del juego: modelos `.glb`, texturas y audio.
   Blender: materiales en mate, orientada hacia +x con los pies en y=0 (~0.55
   unidades de alto). Fuente editable: `~/blender-mcp/gallina_quaternius.blend`
   (script: `~/blender-mcp/gallina_quaternius_finish.py`).
+- `oveja_anim.glb` — oveja riggeada desde cero (14 huesos, pesos procedurales)
+  con animaciones `walk` (marcha lateral de cuadrúpedo, 1 s) e `idle`
+  (respiración, 2 s) como pistas NLA. Orientación y escala HORNEADAS en
+  vértices y huesos (mirando +x, pies en 0, ~1.09 de alto): los transforms de
+  envoltorio no afectan a esqueletizadas en Babylon. Es el que sirve el juego
+  en `public/models/oveja.glb`. Fuente editable: `assets/oveja_rig.blend`.
+  Scripts: `~/blender-mcp/oveja/` (rig_walk.py, validar.py).
 
 ## Cómo se publican los modelos
 
