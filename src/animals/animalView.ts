@@ -15,6 +15,9 @@ interface AnimalVisual {
   tx: number; // objetivo de paseo
   tz: number;
   pause: number; // segundos quieto antes de buscar otro rincón
+  anims?: { walk?: any; idle?: any }; // grupos clonados por instancia (oveja)
+  animActual?: string | null;
+  skeleton?: any; // esqueleto clonado por instancia (oveja)
 }
 
 const SPEED = 0.8; // unidades/segundo (más lento que el jugador y los NPCs)
@@ -80,6 +83,11 @@ export class AnimalView {
     const alive = new Set(this.logic.animals);
     for (const [animal, v] of this.visuals) {
       if (!alive.has(animal)) {
+        // Liberar animación y esqueleto clonados de la instancia (oveja)
+        if (v.anims) {
+          for (const g of Object.values(v.anims)) (g as any)?.dispose?.();
+        }
+        v.skeleton?.dispose?.();
         v.root.dispose();
         this.visuals.delete(animal);
       }
@@ -99,6 +107,7 @@ export class AnimalView {
     for (const v of this.visuals.values()) {
       if (v.pause > 0) {
         v.pause -= dt;
+        this._animar(v, false);
         continue;
       }
       const dx = v.tx - v.root.position.x;
@@ -109,6 +118,7 @@ export class AnimalView {
         v.tx = target.x;
         v.tz = target.z;
         v.pause = 0.5 + Math.random() * 2.5;
+        this._animar(v, false);
         continue;
       }
       const step = Math.min(SPEED * dt, dist);
@@ -117,7 +127,21 @@ export class AnimalView {
       // Los modelos miran hacia +x: con la convención de Babylon (Y arriba,
       // mano izquierda) girar hacia (dx, dz) es atan2(-dz, dx)
       v.root.rotation.y = Math.atan2(-dz, dx);
+      this._animar(v, true);
     }
+  }
+
+  // Alterna walk/idle de la instancia según se mueva (como playerView);
+  // sin animaciones clonadas (gallina, primitivas) no hace nada.
+  private _animar(v: AnimalVisual, moviendo: boolean): void {
+    if (!v.anims) return;
+    const siguiente = moviendo ? 'walk' : 'idle';
+    if (siguiente === v.animActual) return;
+    const grupo = v.anims[siguiente as 'walk' | 'idle'];
+    if (!grupo) return;
+    if (v.animActual) v.anims[v.animActual as 'walk' | 'idle']?.stop();
+    grupo.start(true);
+    v.animActual = siguiente;
   }
 
   // Interacción contextual del animal más cercano (alimentar con pienso)
@@ -231,6 +255,13 @@ export class AnimalView {
     head.position.set(0.45, 0.62, 0);
     head.material = this.mat('#40362e');
     this.world.addShadow(head);
+    this.loadModel(
+      root,
+      'oveja.glb',
+      [body, head],
+      (model, res) => this._attachSheepAnims(root, model, res),
+      true,
+    );
     return root;
   }
 
@@ -275,8 +306,18 @@ export class AnimalView {
   // loaders no cargados) el animal se queda con las primitivas de siempre.
   // El .glb se descarga y parsea una sola vez por especie: el original queda
   // desactivado como plantilla y cada animal es una instancia de su jerarquía.
+  // Con `clonar`, clones reales (Mesh.clone recursivo) en vez de
+  // InstancedMesh: necesario para esqueletizar y animar por instancia
+  // (instantiateHierarchy instancia las mallas con piel en esta versión).
   // Convención del modelo: pies en y=0, mirando hacia +x (ver update()).
-  private async loadModel(root: any, file: string, primitives: any[]): Promise<void> {
+  private _modelSeq = 0;
+  private async loadModel(
+    root: any,
+    file: string,
+    primitives: any[],
+    onModel?: (model: any, res: any) => void,
+    clonar = false,
+  ): Promise<void> {
     try {
       this.modelCache[file] ??= BABYLON.SceneLoader.ImportMeshAsync(
         '',
@@ -285,18 +326,79 @@ export class AnimalView {
         this.scene,
       ).then((res: any) => {
         res.meshes[0].setEnabled(false);
-        return res.meshes[0];
+        return res;
       });
-      const template = await this.modelCache[file];
-      const model = template.instantiateHierarchy();
+      const cached = await this.modelCache[file];
+      const template = cached.meshes[0];
+      // Sin clonar: instantiateHierarchy crea InstancedMesh (rápido, pero
+      // comparte esqueleto: no sirve para animar por instancia).
+      const model = clonar
+        ? template.clone(`${file}_${this._modelSeq++}`, null, false)
+        : template.instantiateHierarchy();
       model.parent = root;
       model.setEnabled(true);
       for (const m of model.getChildMeshes()) {
         if (m.getTotalVertices() > 0) this.world.addShadow(m);
       }
       for (const p of primitives) p.dispose();
+      onModel?.(model, cached);
     } catch {
       // fallback: se quedan las primitivas
     }
+  }
+
+  // Anima una oveja con su propio esqueleto: clona el esqueleto de la
+  // plantilla, lo re-enlaza a los nodos clonados y clona los grupos de
+  // animación (walk/idle) redirigidos a esos nodos. Sin esqueleto o sin
+  // grupos, la oveja se queda estática con el modelo.
+  private _attachSheepAnims(root: any, model: any, res: any): void {
+    const visual = [...this.visuals.values()].find((v) => v.root === root);
+    if (!visual) return;
+    const tplSkel = (res.skeletons ?? [])[0];
+    const grupos = res.animationGroups ?? [];
+    if (!tplSkel || grupos.length === 0) return;
+    // El cargador glTF deja en __root__ un giro de 180° en Y (conversión
+    // diestro→zurdo): el modelo mira hacia -x. Se compone otro medio giro
+    // vía cuaternio (manda sobre `rotation`) para que mire hacia +x como
+    // el resto de modelos. Rotación propia: no altera geometría ni culling.
+    const medioGiro = BABYLON.Quaternion.RotationAxis(BABYLON.Axis.Y, Math.PI);
+    model.rotationQuaternion = (model.rotationQuaternion ?? BABYLON.Quaternion.Identity()).multiply(
+      medioGiro,
+    );
+    // La plantilla queda parada: solo los clones por instancia animan.
+    // (El cargador glTF arranca el primer grupo solo.)
+    for (const g of grupos) g.stop?.();
+    // Mesh.clone conserva los nombres: mapa de este modelo por nombre
+    // (con fallback al prefijo "Clone of " de instantiateHierarchy).
+    const porNombre = new Map<string, any>();
+    porNombre.set(model.name, model);
+    for (const d of model.getDescendants(false)) porNombre.set(d.name, d);
+    const buscar = (nombre: string): any =>
+      porNombre.get(nombre) ?? porNombre.get(`Clone of ${nombre}`);
+    let esqueleto = tplSkel;
+    if (typeof tplSkel.clone === 'function') {
+      esqueleto = tplSkel.clone(`${model.name}_skeleton`);
+      for (const hueso of esqueleto.bones ?? []) {
+        const nodo = buscar(hueso.name);
+        if (nodo && typeof hueso.linkTransformNode === 'function') {
+          hueso.linkTransformNode(nodo);
+        }
+      }
+      for (const m of model.getChildMeshes(false)) {
+        if (m.skeleton === tplSkel) m.skeleton = esqueleto;
+      }
+    }
+    visual.skeleton = esqueleto === tplSkel ? undefined : esqueleto;
+    visual.anims = {};
+    visual.animActual = null;
+    for (const g of grupos) {
+      const nombre = (g.name ?? '').toLowerCase();
+      const clave = nombre.includes('walk') ? 'walk' : nombre.includes('idle') ? 'idle' : null;
+      if (!clave || typeof g.clone !== 'function') continue;
+      const clon = g.clone(`${model.name}_${clave}`, (viejo: any) => buscar(viejo.name) ?? viejo);
+      clon.stop();
+      visual.anims[clave as 'walk' | 'idle'] = clon;
+    }
+    if (Object.keys(visual.anims).length === 0) visual.anims = undefined;
   }
 }
