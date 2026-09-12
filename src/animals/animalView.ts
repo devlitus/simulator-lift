@@ -132,7 +132,7 @@ export class AnimalView {
   }
 
   // Alterna walk/idle de la instancia según se mueva (como playerView);
-  // sin animaciones clonadas (gallina, primitivas) no hace nada.
+  // sin animaciones clonadas no hace nada.
   private _animar(v: AnimalVisual, moviendo: boolean): void {
     if (!v.anims) return;
     const siguiente = moviendo ? 'walk' : 'idle';
@@ -183,7 +183,7 @@ export class AnimalView {
   buildAnimal(type: string): any {
     if (type === 'vaca') return this.buildCow();
     if (type === 'oveja') return this.buildSheep();
-    return this.buildChicken(); // gallina y cualquier especie pequeña futura
+    throw new Error(`especie de animal desconocida: ${type}`);
   }
 
   buildCow(): any {
@@ -274,42 +274,6 @@ export class AnimalView {
     return root;
   }
 
-  buildChicken(): any {
-    const root = new BABYLON.TransformNode('chicken', this.scene);
-    const bodyMat = this.mat(this.defs['gallina'].color);
-
-    const body = BABYLON.MeshBuilder.CreateSphere('chickenBody', { diameter: 0.34 }, this.scene);
-    body.parent = root;
-    body.position.y = 0.22;
-    body.material = bodyMat;
-    this.world.addShadow(body);
-
-    const head = BABYLON.MeshBuilder.CreateSphere('chickenHead', { diameter: 0.18 }, this.scene);
-    head.parent = root;
-    head.position.set(0.16, 0.42, 0);
-    head.material = bodyMat;
-
-    const beak = BABYLON.MeshBuilder.CreateBox(
-      'chickenBeak',
-      { width: 0.1, height: 0.05, depth: 0.05 },
-      this.scene,
-    );
-    beak.parent = root;
-    beak.position.set(0.28, 0.4, 0);
-    beak.material = this.mat('#f2991f');
-
-    const comb = BABYLON.MeshBuilder.CreateBox(
-      'chickenComb',
-      { width: 0.06, height: 0.08, depth: 0.1 },
-      this.scene,
-    );
-    comb.parent = root;
-    comb.position.set(0.16, 0.52, 0);
-    comb.material = this.mat('#d93333');
-    this.loadModel(root, 'gallina.glb', [body, head, beak, comb]);
-    return root;
-  }
-
   // Carga el modelo 3D de una especie (assets/models/, publicado en /models/)
   // y, si tiene éxito, sustituye las primitivas. Si falla (asset ausente,
   // loaders no cargados) el animal se queda con las primitivas de siempre.
@@ -364,7 +328,7 @@ export class AnimalView {
   // cargador glTF deja en `__root__` un giro de 180° en Y (conversión
   // diestro→zurdo), así que un fichero que mira hacia +x aparece mirando
   // hacia -x en el juego (caso de la oveja). Los ficheros que ya miran
-  // hacia -x (gallina, vaca) no lo necesitan.
+  // hacia -x (vaca) no lo necesitan.
   private _attachAnims(root: any, model: any, res: any, medioGiro: boolean): void {
     const visual = [...this.visuals.values()].find((v) => v.root === root);
     if (!visual) return;

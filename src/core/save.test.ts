@@ -17,7 +17,7 @@ function makeState(): GameState {
     produce: { zanahoria: 2 },
     gifts: { flor: 1 },
     feed: 2,
-    animalProducts: { gallina: 1 },
+    animalProducts: { oveja: 1 },
     selectedSeed: 'zanahoria',
     friendships: { marta: 5 },
     talkedToday: { marta: true },
@@ -32,7 +32,7 @@ const fakeQuests = {
   deserialize: () => {},
 } as unknown as QuestPersistence;
 const fakeAnimals = {
-  serialize: () => [{ type: 'gallina', fed: true }],
+  serialize: () => [{ type: 'oveja', fed: true }],
   deserialize: () => {},
 } as unknown as AnimalPersistence;
 
@@ -46,7 +46,7 @@ describe('buildSave / applySave', () => {
       seeds: { zanahoria: 1 },
       produce: { zanahoria: 2 },
       feed: 2,
-      animalProducts: { gallina: 1 },
+      animalProducts: { oveja: 1 },
     });
     expect(data.farm).toEqual(fakeFarm.serialize());
     expect(data.quests).toEqual(fakeQuests.serialize());
@@ -73,10 +73,10 @@ describe('buildSave / applySave', () => {
       produce: {},
       gifts: {},
       feed: 4,
-      animalProducts: { gallina: 2 },
+      animalProducts: { oveja: 2 },
       selectedSeed: 'tomate',
       friendships: { gon: 2 },
-      animals: [{ type: 'gallina', fed: true }],
+      animals: [{ type: 'oveja', fed: true }],
     };
     const farm = { serialize: () => [], deserialize: () => {} } as unknown as FarmPersistence;
     const quests = { serialize: () => [], deserialize: () => {} } as unknown as QuestPersistence;
@@ -93,7 +93,7 @@ describe('buildSave / applySave', () => {
     expect(state.money).toBe(200);
     expect(state.seeds).toEqual({ tomate: 3 });
     expect(state.feed).toBe(4);
-    expect(state.animalProducts).toEqual({ gallina: 2 });
+    expect(state.animalProducts).toEqual({ oveja: 2 });
     expect(loadedAnimals).toEqual(saved.animals);
     expect(state.talkedToday).toEqual({}); // se resetea al cargar
   });
@@ -104,7 +104,7 @@ describe('buildSave / applySave', () => {
     expect(applySave(saved, state, fakeFarm, fakeQuests, fakeAnimals)).toBe(true);
     expect(state.day).toBe(7);
     expect(state.feed).toBe(2); // conserva el valor actual
-    expect(state.animalProducts).toEqual({ gallina: 1 });
+    expect(state.animalProducts).toEqual({ oveja: 1 });
   });
 
   it('devuelve false y no muta el estado si no hay datos', () => {

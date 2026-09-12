@@ -4,14 +4,14 @@ import { AnimalLogic, type AnimalState } from './animalLogic';
 import type { AnimalDef } from '../../data/schemas';
 
 const ANIMALS: Record<string, AnimalDef> = {
-  gallina: {
-    name: 'Gallina',
-    icon: '🐔',
-    price: 40,
-    productName: 'Huevo',
-    productIcon: '🥚',
-    productPrice: 12,
-    color: '#f2eee0',
+  oveja: {
+    name: 'Oveja',
+    icon: '🐑',
+    price: 100,
+    productName: 'Lana',
+    productIcon: '🧶',
+    productPrice: 22,
+    color: '#eae5d9',
   },
   vaca: {
     name: 'Vaca',
@@ -25,7 +25,7 @@ const ANIMALS: Record<string, AnimalDef> = {
 };
 
 function makeState(): AnimalState {
-  return { money: 100, feed: 2, animalProducts: { gallina: 0, vaca: 0 } };
+  return { money: 100, feed: 2, animalProducts: { oveja: 0, vaca: 0 } };
 }
 
 describe('AnimalLogic', () => {
@@ -36,18 +36,18 @@ describe('AnimalLogic', () => {
   beforeEach(() => {
     bus = new EventBus();
     state = makeState();
-    logic = new AnimalLogic(state, bus, ANIMALS, ['gallina']);
+    logic = new AnimalLogic(state, bus, ANIMALS, ['oveja']);
   });
 
   it('empieza con los animales iniciales sin alimentar', () => {
-    expect(logic.animals).toEqual([{ type: 'gallina', fed: false }]);
-    expect(logic.countOf('gallina')).toBe(1);
+    expect(logic.animals).toEqual([{ type: 'oveja', fed: false }]);
+    expect(logic.countOf('oveja')).toBe(1);
   });
 
   it('compra un animal si hay dinero suficiente', () => {
-    expect(logic.buyAnimal('gallina')).toBe(true);
-    expect(state.money).toBe(60);
-    expect(logic.countOf('gallina')).toBe(2);
+    expect(logic.buyAnimal('oveja')).toBe(true);
+    expect(state.money).toBe(0);
+    expect(logic.countOf('oveja')).toBe(2);
   });
 
   it('no compra si falta dinero, y no muta el estado', () => {
@@ -79,13 +79,13 @@ describe('AnimalLogic', () => {
     logic.feedAnimal(0);
     const { produced } = logic.newDay();
     expect(produced).toBe(1);
-    expect(state.animalProducts.gallina).toBe(1);
+    expect(state.animalProducts.oveja).toBe(1);
     expect(logic.animals[0].fed).toBe(false);
   });
 
   it('los animales sin alimentar no producen', () => {
     expect(logic.newDay().produced).toBe(0);
-    expect(state.animalProducts.gallina).toBe(0);
+    expect(state.animalProducts.oveja).toBe(0);
   });
 
   it('serialize/deserialize conserva especies y estado de alimentación', () => {
@@ -97,14 +97,14 @@ describe('AnimalLogic', () => {
     const other = new AnimalLogic(makeState(), bus, ANIMALS, []);
     other.deserialize(JSON.parse(JSON.stringify(saved)));
     expect(other.animals).toEqual([
-      { type: 'gallina', fed: true },
+      { type: 'oveja', fed: true },
       { type: 'vaca', fed: false },
     ]);
   });
 
   it('deserialize ignora datos inválidos o especies desconocidas', () => {
     logic.deserialize('no-es-un-array');
-    expect(logic.countOf('gallina')).toBe(1); // sin cambios
+    expect(logic.countOf('oveja')).toBe(1); // sin cambios
 
     logic.deserialize([{ type: 'dragon', fed: true }, { type: 'vaca', fed: true }, null]);
     expect(logic.animals).toEqual([{ type: 'vaca', fed: true }]);
