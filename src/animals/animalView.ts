@@ -219,6 +219,7 @@ export class AnimalView {
     muzzle.position.set(1.05, 0.95, 0);
     muzzle.material = this.mat('#bf8c73');
 
+    const legs: any[] = [];
     for (const [lx, lz] of [
       [-0.45, -0.22],
       [-0.45, 0.22],
@@ -233,7 +234,15 @@ export class AnimalView {
       leg.parent = root;
       leg.position.set(lx, 0.25, lz);
       leg.material = bodyMat;
+      legs.push(leg);
     }
+    this.loadModel(
+      root,
+      'vaca.glb',
+      [body, head, muzzle, ...legs],
+      (model, res) => this._attachAnims(root, model, res, false),
+      true,
+    );
     return root;
   }
 
@@ -259,7 +268,7 @@ export class AnimalView {
       root,
       'oveja.glb',
       [body, head],
-      (model, res) => this._attachSheepAnims(root, model, res),
+      (model, res) => this._attachAnims(root, model, res, true),
       true,
     );
     return root;
@@ -347,24 +356,31 @@ export class AnimalView {
     }
   }
 
-  // Anima una oveja con su propio esqueleto: clona el esqueleto de la
+  // Anima un animal con su propio esqueleto: clona el esqueleto de la
   // plantilla, lo re-enlaza a los nodos clonados y clona los grupos de
   // animación (walk/idle) redirigidos a esos nodos. Sin esqueleto o sin
-  // grupos, la oveja se queda estática con el modelo.
-  private _attachSheepAnims(root: any, model: any, res: any): void {
+  // grupos, el animal se queda estático con el modelo.
+  // Con `medioGiro`, compone además medio giro en Y sobre el modelo: el
+  // cargador glTF deja en `__root__` un giro de 180° en Y (conversión
+  // diestro→zurdo), así que un fichero que mira hacia +x aparece mirando
+  // hacia -x en el juego (caso de la oveja). Los ficheros que ya miran
+  // hacia -x (gallina, vaca) no lo necesitan.
+  private _attachAnims(root: any, model: any, res: any, medioGiro: boolean): void {
     const visual = [...this.visuals.values()].find((v) => v.root === root);
     if (!visual) return;
     const tplSkel = (res.skeletons ?? [])[0];
     const grupos = res.animationGroups ?? [];
     if (!tplSkel || grupos.length === 0) return;
-    // El cargador glTF deja en __root__ un giro de 180° en Y (conversión
-    // diestro→zurdo): el modelo mira hacia -x. Se compone otro medio giro
-    // vía cuaternio (manda sobre `rotation`) para que mire hacia +x como
-    // el resto de modelos. Rotación propia: no altera geometría ni culling.
-    const medioGiro = BABYLON.Quaternion.RotationAxis(BABYLON.Axis.Y, Math.PI);
-    model.rotationQuaternion = (model.rotationQuaternion ?? BABYLON.Quaternion.Identity()).multiply(
-      medioGiro,
-    );
+    if (medioGiro) {
+      // Solo para ficheros que miran hacia +x (caso de la oveja): compone
+      // otro medio giro vía cuaternio (manda sobre `rotation`) para que mire
+      // hacia +x como el resto de modelos. Rotación propia: no altera
+      // geometría ni culling.
+      const giro = BABYLON.Quaternion.RotationAxis(BABYLON.Axis.Y, Math.PI);
+      model.rotationQuaternion = (
+        model.rotationQuaternion ?? BABYLON.Quaternion.Identity()
+      ).multiply(giro);
+    }
     // La plantilla queda parada: solo los clones por instancia animan.
     // (El cargador glTF arranca el primer grupo solo.)
     for (const g of grupos) g.stop?.();
