@@ -19,6 +19,20 @@ Contenido binario del juego: modelos `.glb`, texturas y audio.
   enviados a Blender con `~/blender-mcp/bcmd.py`).
 - `granjero_original.glb` — copia del modelo original sin texturizar ni recortar
   la peana (respaldo).
+- `models/gallina.glb` — modelo 3D de la gallina generado con Hunyuan3D-2
+  (servidor local, imagen→3D con textura 2048×2048) a partir de
+  `assets/gallina_referencia.png` (imagen generada con ComfyUI en Windows,
+  workflow `zimage_gallina.json`: Z-Image-Turbo). Limpio (vértices soldados,
+  una sola isla de ~19k vértices), con la cabeza hacia -x (el giro de 180°
+  en Y del cargador glTF la deja mirando hacia +x en el juego, como la vaca)
+  y los pies en y=0 (~0.55 unidades de alto). CON rig propio de 12 huesos y
+  animaciones `walk` (paso bípedo con cabeceo, 1 s) e `idle` (respiración,
+  miradas y picoteo, 2 s) como pistas NLA (mismo proceso que la vaca: huesos
+  en espacio "gallina" con frente +Y convertidos con rot +90° Z; pesos
+  procedurales; pico, ojos y cresta rígidos con la cabeza). Es el que sirve
+  el juego en `public/models/gallina.glb`. Fuentes editables:
+  `assets/gallina.blend` (malla limpia sin rig) y `assets/gallina_rig.blend`
+  (rig).
 - `models/vaca.glb` — modelo 3D de la vaca generado con Hunyuan3D-2 (servidor
   local, imagen→3D con textura 2048×2048) a partir de `assets/vaca_referencia.png`
   (imagen generada con ComfyUI en Windows, workflow `z_image_turbo_int8.json`).
