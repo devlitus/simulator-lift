@@ -25,14 +25,14 @@ const GIFTS: Record<string, GiftDef> = {
   flor: { name: 'Flor', icon: '🌸', price: 20, points: 2 },
 };
 const ANIMALS: Record<string, AnimalDef> = {
-  gallina: {
-    name: 'Gallina',
-    icon: '🐔',
-    price: 40,
-    productName: 'Huevo',
-    productIcon: '🥚',
-    productPrice: 12,
-    color: '#f2eee0',
+  oveja: {
+    name: 'Oveja',
+    icon: '🐑',
+    price: 100,
+    productName: 'Lana',
+    productIcon: '🧶',
+    productPrice: 22,
+    color: '#eae5d9',
   },
 };
 const FEED: FeedDef = { name: 'Pienso', icon: '🌾', price: 5 };
@@ -44,7 +44,7 @@ function makeState(): EconomyState {
     produce: { zanahoria: 2, tomate: 1 },
     gifts: { flor: 0 },
     feed: 0,
-    animalProducts: { gallina: 0 },
+    animalProducts: { oveja: 0 },
   };
 }
 
@@ -99,10 +99,10 @@ describe('Economy', () => {
   });
 
   it('vende también los productos de los animales', () => {
-    state.animalProducts.gallina = 3;
+    state.animalProducts.oveja = 3;
     const total = economy.sellAllProduce();
-    expect(total).toBe(90 + 3 * 12); // 126
-    expect(state.animalProducts).toEqual({ gallina: 0 });
+    expect(total).toBe(90 + 3 * 22); // 156
+    expect(state.animalProducts).toEqual({ oveja: 0 });
   });
 
   it('vender sin cosecha no cambia el dinero', () => {

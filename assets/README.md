@@ -19,18 +19,12 @@ Contenido binario del juego: modelos `.glb`, texturas y audio.
   enviados a Blender con `~/blender-mcp/bcmd.py`).
 - `granjero_original.glb` — copia del modelo original sin texturizar ni recortar
   la peana (respaldo).
-- `models/gallina.glb` — modelo 3D de la gallina: asset
-  [Chicken de Quaternius](https://poly.pizza/m/ineV9pU5VL) (CC0, ~1.6k vértices,
-  con animaciones idle/walk/etc. en el propio .glb para uso futuro). Acabado en
-  Blender: materiales en mate, orientada hacia +x con los pies en y=0 (~0.55
-  unidades de alto). Fuente editable: `~/blender-mcp/gallina_quaternius.blend`
-  (script: `~/blender-mcp/gallina_quaternius_finish.py`).
 - `models/vaca.glb` — modelo 3D de la vaca generado con Hunyuan3D-2 (servidor
   local, imagen→3D con textura 2048×2048) a partir de `assets/vaca_referencia.png`
   (imagen generada con ComfyUI en Windows, workflow `z_image_turbo_int8.json`).
   Limpio (vértices soldados, una sola isla de ~20k vértices), con la cabeza
   hacia -x (el giro de 180° en Y del cargador glTF la deja mirando hacia +x
-  en el juego, como la gallina) y los pies en y=0 (~1.2 unidades de alto).
+  en el juego, como la oveja) y los pies en y=0 (~1.2 unidades de alto).
   CON rig propio de 15 huesos y animaciones `walk` (marcha lateral de
   cuadrúpedo, 1 s) e `idle` (respiración, 2 s) como pistas NLA (mismo proceso
   que la oveja: huesos en espacio "vaca" con frente +Y convertidos con rot
