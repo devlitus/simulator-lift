@@ -98,10 +98,11 @@ export class NPCSystemView {
     acc.parent = root;
 
     const primitivas = [body, head, acc];
-    // Marta y Lila tienen modelo 3D propio (assets/models/*.glb, publicados
-    // en /models/); Gon sigue con primitivas por ahora.
+    // Los tres NPCs tienen modelo 3D propio (assets/models/*.glb, publicados
+    // en /models/).
     if (def.id === 'marta') this._loadNpcModel(world, root, primitivas, 'marta.glb');
     else if (def.id === 'lila') this._loadNpcModel(world, root, primitivas, 'lila.glb');
+    else if (def.id === 'gon') this._loadNpcModel(world, root, primitivas, 'gon.glb');
 
     return {
       def,
@@ -117,9 +118,9 @@ export class NPCSystemView {
 
   // Carga el modelo 3D de un NPC (assets/models/*.glb, publicado en
   // /models/). Si falla (sin red, asset ausente, loaders no cargados) se
-  // queda con las primitivas de siempre. Lila trae rig con walk/idle
-  // (pistas NLA): se alternan según patrulle o esté parada, como el
-  // granjero; Marta es estática y no trae animaciones.
+  // queda con las primitivas de siempre. Lila y Gon traen rig con
+  // walk/idle (pistas NLA): se alternan según patrullen o estén parados,
+  // como el granjero; Marta es estática y no trae animaciones.
   private async _loadNpcModel(
     world: WorldView,
     root: any,
