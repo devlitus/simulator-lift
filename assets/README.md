@@ -44,6 +44,23 @@ Contenido binario del juego: modelos `.glb`, texturas y audio.
   armature humanoide de 19 huesos con pesos procedurales, walk (1 s) e idle
   (2 s) como pistas NLA; la vista alterna walk/idle al patrullar. Membranas
   entre botas y espinillas eliminadas (se estiraban al andar).
+- `models/gon.glb` — modelo 3D de Gon (el herrero) generado con
+  Hunyuan3D-2 (servidor local, imagen→3D con textura) a partir de
+  `assets/gon_referencia.png` (imagen generada con ComfyUI en Windows,
+  workflow `image_qwen_image_edit_2511_int8`: Qwen-Image-Edit 2511 Int8 en
+  modo edición semántica sobre `marta_referencia.png`, herrero chibi con
+  camisa gris y delantal de cuero marrón). Limpio (vértices soldados
+  25k→20k, una sola isla de ~40k caras, sin borrar nada), con la cara
+  girada de -Y a +Y (convención del juego) y los pies en z=0 (~1.96 de
+  alto; la vista lo escala a ~1.5 m por caja envolvente). CON rig propio
+  de 19 huesos y animaciones `walk` masculino (1 s: zancada amplia, poco
+  balanceo de cadera, contrarrotación de hombros, brazos rectos algo
+  separados) e `idle` (respiración y cambios de peso, 2 s) como pistas NLA
+  (plano de corte ax=0.345 entre muslo y manga interior para que no se
+  desgarren al caminar). Es el que sirve
+  el juego en `public/models/gon.glb`. Fuentes editables:
+  `assets/gon.blend` (malla limpia), `assets/gon_rig.blend` (rig) y
+  `assets/gon_referencia.png`; script `~/blender-mcp/gon/rig_walk.py`.
 - `models/gallina.glb` — modelo 3D de la gallina generado con Hunyuan3D-2
   (servidor local, imagen→3D con textura 2048×2048) a partir de
   `assets/gallina_referencia.png` (imagen generada con ComfyUI en Windows,
