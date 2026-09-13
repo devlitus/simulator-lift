@@ -44,10 +44,10 @@ export class WorldView {
       this.shadow.usePercentageCloserFiltering = true;
     }
 
-    // Punto de venta: la puerta del almacén del granjero (main.ts lo usa
-    // como interactuable). Al este de la parcela, separado de los surcos
-    // (la última columna llega hasta x≈10.7; el almacén ocupa desde 12.25).
-    this.sellBin = { x: 13.5, z: 5 };
+    // Punto de venta: delante del mostrador del puesto de ventas, al este
+    // del almacén (main.ts lo usa como interactuable). La puerta del
+    // almacén ya no es interactuable: la sustituye el puesto.
+    this.sellBin = { x: 16.3, z: 6.9 };
 
     this.buildGround();
     this.buildBounds();
@@ -182,6 +182,7 @@ export class WorldView {
     this.buildHouse(-14, -10, this.mat(0.55, 0.56, 0.6)); // Forja de Gon (gris)
     this.buildHouse(4, -18, this.mat(0.5, 0.72, 0.5)); // Casa de Lila (verde)
     this.buildStorage(); // Almacén del granjero, al este de la parcela
+    this.buildSalesStand(); // Puesto de ventas, al este del almacén
 
     // Escaparate de la tienda (mostrador)
     const counter = BABYLON.MeshBuilder.CreateBox(
@@ -201,12 +202,12 @@ export class WorldView {
   }
 
   // Almacén del granjero: modelo GLB (assets/almacen.glb, publicado en
-  // /models/) con fallback a primitivas si falla la carga. Sustituye a la
-  // antigua caja de ventas: va al este de la parcela, separado de los
-  // surcos, con la puerta mirando a la parcela (oeste, -x). La interacción
-  // de venta (main.ts) sigue en el mismo punto, ahora la puerta del almacén.
+  // /models/) con fallback a primitivas si falla la carga. Va al este de la
+  // parcela, separado de los surcos, con la puerta mirando a la parcela
+  // (oeste, -x). Ya no es interactuable: la venta pasa por el puesto de
+  // ventas (buildSalesStand), que queda justo al este del almacén.
   buildStorage(): void {
-    const { x, z } = this.sellBin; // (13.5, 5): antigua caja de ventas
+    const { x, z } = { x: 13.5, z: 5 }; // posición del almacén
 
     // Colisión fija (independiente del modelo): caja invisible que cubre el
     // volumen del almacén (~2.4×2.2×2.4 tras el escalado de la vista), para
@@ -301,6 +302,115 @@ export class WorldView {
     }
   }
 
+  // Puesto de ventas: modelo GLB (assets/puesto_ventas.glb, publicado en
+  // /models/) con fallback a primitivas si falla la carga. Va al este del
+  // almacén, con el mostrador mirando al sur (+z), hacia el espacio abierto
+  // por el que se acerca el granjero. El GLB mide ~1.96×1.94×1.21 (la vista
+  // lo escala a ~1.9 de alto): es ancho y poco profundo, con el mostrador en
+  // la cara -z del archivo (como la puerta del almacén). El cargador glTF
+  // de Babylon ya aplica el giro de conversión de sistema de coordenadas en
+  // el contenedor del modelo, así que el root se deja sin rotación: el
+  // mostrador queda mirando al sur. Sustituye a la puerta del almacén como
+  // punto de venta: sellBin queda delante del mostrador (main.ts no cambia).
+  buildSalesStand(): void {
+    const x = 16.3;
+    const z = 5;
+
+    // Colisión fija (independiente del modelo): caja invisible que cubre el
+    // volumen del puesto (~1.9×1.9×1.2 tras el escalado de la vista). El
+    // mostrador queda en la cara norte (z≈5): el cuerpo va de z≈5 a z≈6.2.
+    const hit = BABYLON.MeshBuilder.CreateBox(
+      'salesStandHit',
+      { width: 2.0, height: 2.0, depth: 1.4 },
+      this.scene,
+    );
+    hit.position.set(x, 1.0, 5.6);
+    hit.isVisible = false;
+    hit.physicsImpostor = new BABYLON.PhysicsImpostor(
+      hit,
+      BABYLON.PhysicsImpostor.BoxImpostor,
+      { mass: 0 },
+      this.scene,
+    );
+
+    // Nodo raíz sin rotación: el cargador glTF ya orienta el contenedor
+    // (giro π de conversión), dejando el mostrador mirando al sur.
+    const root = new BABYLON.TransformNode('salesStandRoot', this.scene);
+    root.position.set(x, 0, z);
+
+    // Primitivas de respaldo, con el estilo del resto del pueblo (en
+    // espacio local: el mostrador hacia +z, como queda el GLB cargado)
+    const prims: any[] = [];
+    const counter = BABYLON.MeshBuilder.CreateBox(
+      'salesStandCounter',
+      { width: 1.8, height: 0.9, depth: 0.5 },
+      this.scene,
+    );
+    counter.parent = root;
+    counter.position.set(0, 0.45, 0.85);
+    counter.material = this.mat(0.55, 0.38, 0.22);
+    counter.receiveShadows = true;
+    this.addShadow(counter);
+    prims.push(counter);
+
+    const awning = BABYLON.MeshBuilder.CreateBox(
+      'salesStandAwning',
+      { width: 2.0, height: 0.08, depth: 1.3 },
+      this.scene,
+    );
+    awning.parent = root;
+    awning.position.set(0, 1.8, 0.6);
+    awning.rotation.x = 0.1;
+    awning.material = this.mat(0.78, 0.2, 0.18);
+    this.addShadow(awning);
+    prims.push(awning);
+
+    for (const [px, pz] of [
+      [-0.8, 0.15],
+      [0.8, 0.15],
+      [-0.8, 1.05],
+      [0.8, 1.05],
+    ]) {
+      const pole = BABYLON.MeshBuilder.CreateBox(
+        'salesStandPole',
+        { width: 0.12, height: 1.8, depth: 0.12 },
+        this.scene,
+      );
+      pole.parent = root;
+      pole.position.set(px, 0.9, pz);
+      pole.material = this.mat(0.45, 0.32, 0.2);
+      this.addShadow(pole);
+      prims.push(pole);
+    }
+
+    this._loadSalesStand(root, prims);
+  }
+
+  // Carga el GLB del puesto y sustituye a las primitivas (mismo patrón que
+  // _loadStorage: escala y apoyo en suelo por caja envolvente real).
+  private async _loadSalesStand(root: any, prims: any[]): Promise<void> {
+    try {
+      const res = await BABYLON.SceneLoader.ImportMeshAsync(
+        '',
+        '/models/',
+        'puesto_ventas.glb',
+        this.scene,
+      );
+      const model = res.meshes[0];
+      const { min, max } = model.getHierarchyBoundingVectors(true);
+      const escala = 1.9 / (max.y - min.y);
+      model.parent = root;
+      model.scaling = new BABYLON.Vector3(escala, escala, escala);
+      model.position.y = -min.y * escala;
+      for (const m of res.meshes) {
+        if (m.getTotalVertices() > 0) this.addShadow(m);
+      }
+      for (const p of prims) p.dispose();
+    } catch {
+      // fallback: se quedan las primitivas
+    }
+  }
+
   buildTree(x: number, z: number): void {
     const trunk = BABYLON.MeshBuilder.CreateCylinder(
       'trunk',
@@ -332,7 +442,7 @@ export class WorldView {
     const spots = [
       [8, 11],
       [-10, 9],
-      [17, 5],
+      [20, 3],
       [-20, 3],
       [7, -11],
       [-7, -14],

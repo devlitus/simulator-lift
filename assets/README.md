@@ -115,6 +115,18 @@ Contenido binario del juego: modelos `.glb`, texturas y audio.
   workflow, mapas y preview en [`assets/pozo/`](pozo/README.md).
   Se sirve como `public/models/pozo.glb`, con colisión independiente y
   respaldo de primitivas si falla la carga.
+- `puesto_ventas.glb` — modelo 3D del puesto de ventas del granjero generado
+  con Hunyuan3D-2 (servidor local, imagen→3D con textura 2048×2048) a partir
+  de `assets/puesto_ventas_referencia.png` (imagen generada con ComfyUI en
+  Windows, workflow `image_qwen_Image_2512.json`: Qwen-Image 2512, puesto de
+  madera low-poly estilo Stardew Valley con toldo a rayas rojas y blancas).
+  Limpio (vértices soldados 26k→20k, una sola isla de 40k caras), girado 180°
+  en Z (convención del juego), base en y=0 y centrado en el origen
+  (~1.96×1.23×1.94 unidades; la vista lo escala por caja envolvente). SIN
+  rig ni animaciones (objeto estático). Sustituye a la puerta del almacén
+  como punto de venta (interactuable de `worldView.sellBin`). Fuentes
+  editables: `assets/puesto_ventas.blend` (malla limpia) y
+  `assets/puesto_ventas_referencia.png`.
 
 ## Cómo se publican los modelos
 
