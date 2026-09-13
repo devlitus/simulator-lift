@@ -1,0 +1,21 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "comfy-mcp": {
+      "type": "local",
+      "command": ["/mnt/c/ComfyUI_windows_portable_nvidia/ComfyUI_windows_portable/python_embeded/Scripts/comfy-mcp.exe"],
+      "environment": {
+        "COMFY_BIN": "C:/ComfyUI_windows_portable_nvidia/ComfyUI_windows_portable/python_embeded/Scripts/comfy.exe"
+      },
+      "enabled": true,
+      "timeout": 30000
+    },
+    "blender-mcp": {
+      "type": "local",
+      "command": ["/home/carle/.local/bin/uvx", "blender-mcp"],
+      "enabled": true,
+      "timeout": 30000
+    }
+  },
+  "lsp": true
+}
