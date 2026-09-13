@@ -13,6 +13,15 @@ import {
 // Un animal alimentado produce 1 unidad de su producto al empezar el día
 // siguiente (ver src/animals/animalLogic.ts).
 export const ANIMALS: Record<string, AnimalDef> = AnimalsSchema.parse({
+  gallina: {
+    name: 'Gallina',
+    icon: '🐔',
+    price: 40,
+    productName: 'Huevo',
+    productIcon: '🥚',
+    productPrice: 12,
+    color: '#f2eee0',
+  },
   oveja: {
     name: 'Oveja',
     icon: '🐑',

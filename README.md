@@ -12,7 +12,7 @@ Simulador de vida de pueblo en 3D, inspirado en Stardew Valley, que corre direct
 ## Qué puedes hacer
 
 - **Cultivar**: planta zanahorias, tomates y calabazas, riégalos cada día (si no, se marchitan) y vende la cosecha.
-- **Criar animales**: vacas y ovejas te dan leche y lana si las alimentas a diario.
+- **Criar animales**: gallinas, vacas y ovejas te dan huevos, leche y lana si las alimentas a diario.
 - **Hacer amigos**: habla con los vecinos y regálales cosas para subir la amistad y descubrir sus diálogos.
 - **Completar misiones**: desde presentarte al pueblo hasta entregas y cosechas encargadas.
 - **Vivir el paso de los días**: ciclo de día y noche, y la partida se guarda sola al empezar cada día.

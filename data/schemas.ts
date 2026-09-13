@@ -84,7 +84,7 @@ export const AnimalSchema = z.object({
   name: z.string(),
   icon: z.string(),
   price: z.number().int().positive(), // precio de compra del animal
-  productName: z.string(), // lo que produce si se le alimenta (Leche, Lana…)
+  productName: z.string(), // lo que produce si se le alimenta (Huevo, Leche, Lana…)
   productIcon: z.string(),
   productPrice: z.number().int().positive(), // precio de venta del producto
   color: z.string().regex(/^#[0-9a-fA-F]{6}$/), // color del cuerpo en la vista
