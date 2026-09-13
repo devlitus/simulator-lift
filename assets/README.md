@@ -106,6 +106,16 @@ Contenido binario del juego: modelos `.glb`, texturas y audio.
   SIN rig ni animaciones (edificio estático). Fuentes editables:
   `assets/almacen.blend` (malla limpia) y `assets/almacen_referencia.png`.
 
+- `pozo.glb` — pozo de piedra, madera y terracota con brocal hueco, torno,
+  cuerda y cubo. Referencia `assets/pozo_referencia.png` generada con ComfyUI
+  (`image_qwen_Image_2512`, Qwen Image 2512 FP8, 1024×1024, seed 13092026).
+  Modelado propio en Blender con atlas PBR de 1024×1024: color, oclusión,
+  rugosidad, metalicidad y normales. Tres LOD de 4.800 / 2.400 / ~1.440
+  triángulos, sin rig. Fuente editable `assets/pozo.blend`; script,
+  workflow, mapas y preview en [`assets/pozo/`](pozo/README.md).
+  Se sirve como `public/models/pozo.glb`, con colisión independiente y
+  respaldo de primitivas si falla la carga.
+
 ## Cómo se publican los modelos
 
 Vite solo publica lo que hay en `public/`, así que los `.glb` que usa el juego

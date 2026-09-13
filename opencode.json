@@ -3,7 +3,9 @@
   "mcp": {
     "comfy-mcp": {
       "type": "local",
-      "command": ["/mnt/c/ComfyUI_windows_portable_nvidia/ComfyUI_windows_portable/python_embeded/Scripts/comfy-mcp.exe"],
+      "command": [
+        "/mnt/c/ComfyUI_windows_portable_nvidia/ComfyUI_windows_portable/python_embeded/Scripts/comfy-mcp.exe"
+      ],
       "environment": {
         "COMFY_BIN": "C:/ComfyUI_windows_portable_nvidia/ComfyUI_windows_portable/python_embeded/Scripts/comfy.exe"
       },

@@ -1,0 +1,23 @@
+[
+  {
+    "nombre": "SM_Pozo_LOD0",
+    "triangulos": 4800,
+    "vertices": 2628,
+    "aristas_no_manifold": 0,
+    "caras_degeneradas": 0
+  },
+  {
+    "nombre": "SM_Pozo_LOD1",
+    "triangulos": 2400,
+    "vertices": 1428,
+    "aristas_no_manifold": 0,
+    "caras_degeneradas": 0
+  },
+  {
+    "nombre": "SM_Pozo_LOD2",
+    "triangulos": 1440,
+    "vertices": 948,
+    "aristas_no_manifold": 0,
+    "caras_degeneradas": 0
+  }
+]
