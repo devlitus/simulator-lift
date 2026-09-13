@@ -95,6 +95,17 @@ Contenido binario del juego: modelos `.glb`, texturas y audio.
   en `public/models/oveja.glb`. Fuente editable: `assets/oveja_rig.blend`.
   Scripts: `~/blender-mcp/oveja/` (rig_walk.py, validar.py).
 
+- `almacen.glb` — modelo 3D del almacén del granjero generado con Hunyuan3D-2
+  (servidor local, imagen→3D con textura 2048×2048) a partir de
+  `assets/almacen_referencia.png` (imagen generada con ComfyUI en Windows,
+  workflow `z_image_turbo_int8.json`: Z-Image-Turbo, granero low-poly estilo
+  Stardew Valley con paredes de madera, tejado rojo a dos aguas y puerta
+  doble). Limpio (vértices soldados 23.7k→20k, una sola isla de ~40k caras),
+  girado 180° en Z (convención del juego), base en y=0 y centrado en el
+  origen (~1.96×1.83×1.96 unidades; la vista lo escala por caja envolvente).
+  SIN rig ni animaciones (edificio estático). Fuentes editables:
+  `assets/almacen.blend` (malla limpia) y `assets/almacen_referencia.png`.
+
 ## Cómo se publican los modelos
 
 Vite solo publica lo que hay en `public/`, así que los `.glb` que usa el juego
