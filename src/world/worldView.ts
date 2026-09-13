@@ -44,6 +44,11 @@ export class WorldView {
       this.shadow.usePercentageCloserFiltering = true;
     }
 
+    // Punto de venta: la puerta del almacén del granjero (main.ts lo usa
+    // como interactuable). Al este de la parcela, separado de los surcos
+    // (la última columna llega hasta x≈10.7; el almacén ocupa desde 12.25).
+    this.sellBin = { x: 13.5, z: 5 };
+
     this.buildGround();
     this.buildBounds();
     this.buildPaths();
@@ -51,9 +56,6 @@ export class WorldView {
     this.buildTrees();
     this.buildDecor();
     this.buildPen();
-
-    // Posición de la caja de ventas (main.ts la usa como interactuable)
-    this.sellBin = { x: 11.8, z: 5 };
   }
 
   addShadow(mesh: any): void {
@@ -179,6 +181,7 @@ export class WorldView {
     this.buildHouse(12, -8, this.mat(0.85, 0.55, 0.65)); // Tienda de Marta (rosa)
     this.buildHouse(-14, -10, this.mat(0.55, 0.56, 0.6)); // Forja de Gon (gris)
     this.buildHouse(4, -18, this.mat(0.5, 0.72, 0.5)); // Casa de Lila (verde)
+    this.buildStorage(); // Almacén del granjero, al este de la parcela
 
     // Escaparate de la tienda (mostrador)
     const counter = BABYLON.MeshBuilder.CreateBox(
@@ -195,6 +198,107 @@ export class WorldView {
       this.scene,
     );
     this.addShadow(counter);
+  }
+
+  // Almacén del granjero: modelo GLB (assets/almacen.glb, publicado en
+  // /models/) con fallback a primitivas si falla la carga. Sustituye a la
+  // antigua caja de ventas: va al este de la parcela, separado de los
+  // surcos, con la puerta mirando a la parcela (oeste, -x). La interacción
+  // de venta (main.ts) sigue en el mismo punto, ahora la puerta del almacén.
+  buildStorage(): void {
+    const { x, z } = this.sellBin; // (13.5, 5): antigua caja de ventas
+
+    // Colisión fija (independiente del modelo): caja invisible que cubre el
+    // volumen del almacén (~2.4×2.2×2.4 tras el escalado de la vista), para
+    // que el granjero no pueda atravesarlo.
+    const hit = BABYLON.MeshBuilder.CreateBox(
+      'storageHit',
+      { width: 2.5, height: 2.4, depth: 2.5 },
+      this.scene,
+    );
+    hit.position.set(x, 1.2, z);
+    hit.isVisible = false;
+    hit.physicsImpostor = new BABYLON.PhysicsImpostor(
+      hit,
+      BABYLON.PhysicsImpostor.BoxImpostor,
+      { mass: 0 },
+      this.scene,
+    );
+
+    // Nodo raíz: posición y giro para que la puerta mire a la parcela
+    // (oeste, -x): la puerta del GLB mira hacia +z, como las casas; -π/2 en
+    // Y la deja en -x.
+    const root = new BABYLON.TransformNode('storageRoot', this.scene);
+    root.position.set(x, 0, z);
+    root.rotation.y = -Math.PI / 2;
+
+    // Primitivas de respaldo (colgadas del root: la puerta en +z local
+    // queda hacia +x del mundo), con el estilo del resto del pueblo
+    const prims: any[] = [];
+    const base = BABYLON.MeshBuilder.CreateBox(
+      'storageBase',
+      { width: 2.4, height: 1.5, depth: 2.4 },
+      this.scene,
+    );
+    base.parent = root;
+    base.position.y = 0.75;
+    base.material = this.mat(0.55, 0.38, 0.22);
+    base.receiveShadows = true;
+    this.addShadow(base);
+    prims.push(base);
+
+    // Tejado a dos aguas: dos tablas inclinadas con voladizo
+    const roofMat = this.mat(0.55, 0.22, 0.18);
+    for (const side of [-1, 1]) {
+      const slope = BABYLON.MeshBuilder.CreateBox(
+        'storageRoof',
+        { width: 2.9, height: 0.08, depth: 1.1 },
+        this.scene,
+      );
+      slope.parent = root;
+      slope.position.set(0, 2.0, side * 0.55);
+      slope.rotation.x = side * 0.72;
+      slope.material = roofMat;
+      this.addShadow(slope);
+      prims.push(slope);
+    }
+
+    const door = BABYLON.MeshBuilder.CreateBox(
+      'storageDoor',
+      { width: 1.1, height: 1.25, depth: 0.1 },
+      this.scene,
+    );
+    door.parent = root;
+    door.position.set(0, 0.63, 1.21);
+    door.material = this.mat(0.35, 0.22, 0.1);
+    prims.push(door);
+
+    this._loadStorage(root, prims);
+  }
+
+  // Carga el GLB del almacén y sustituye a las primitivas (mismo patrón que
+  // playerView/npcView: escala y apoyo en suelo por caja envolvente real).
+  private async _loadStorage(root: any, prims: any[]): Promise<void> {
+    try {
+      const res = await BABYLON.SceneLoader.ImportMeshAsync(
+        '',
+        '/models/',
+        'almacen.glb',
+        this.scene,
+      );
+      const model = res.meshes[0];
+      const { min, max } = model.getHierarchyBoundingVectors(true);
+      const escala = 2.2 / (max.y - min.y);
+      model.parent = root;
+      model.scaling = new BABYLON.Vector3(escala, escala, escala);
+      model.position.y = -min.y * escala;
+      for (const m of res.meshes) {
+        if (m.getTotalVertices() > 0) this.addShadow(m);
+      }
+      for (const p of prims) p.dispose();
+    } catch {
+      // fallback: se quedan las primitivas
+    }
   }
 
   buildTree(x: number, z: number): void {
@@ -257,28 +361,8 @@ export class WorldView {
     );
     this.addShadow(well);
 
-    // Caja de ventas junto a la granja (al este de la parcela)
-    const bin = BABYLON.MeshBuilder.CreateBox(
-      'sellBin',
-      { width: 1.4, height: 1, depth: 1.4 },
-      this.scene,
-    );
-    bin.position.set(11.8, 0.5, 5);
-    bin.material = this.mat(0.6, 0.4, 0.2);
-    bin.physicsImpostor = new BABYLON.PhysicsImpostor(
-      bin,
-      BABYLON.PhysicsImpostor.BoxImpostor,
-      { mass: 0 },
-      this.scene,
-    );
-    this.addShadow(bin);
-    const lid = BABYLON.MeshBuilder.CreateBox(
-      'sellBinLid',
-      { width: 1.5, height: 0.12, depth: 1.5 },
-      this.scene,
-    );
-    lid.position.set(11.8, 1.06, 5);
-    lid.material = this.mat(0.45, 0.3, 0.14);
+    // La antigua caja de ventas ya no existe: la sustituye el almacén del
+    // granjero (buildStorage), que ocupa su lugar al este de la parcela.
 
     // Jardín de flores de Lila (decorativo)
     const flowerColors = [
