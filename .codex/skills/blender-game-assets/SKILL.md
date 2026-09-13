@@ -3,137 +3,67 @@ name: blender-game-assets
 description: Pipeline completo Blender para modelos 3D game-ready — blocking, high/low poly, retopo, UV, bake, PBR, LOD, colision, rig y export FBX a Unity/Unreal/Godot.
 ---
 
-# Blender — Modelos 3D para Juegos (Game-Ready)
+Proceso completo imagen→3D→juego, probado en este repo. Sigue los pasos en orden; las trampas conocidas están marcadas con ⚠️.
 
-Pipeline estándar industria (Blender → Unity / Unreal / Godot). Sintetizado de Meshy, Hyper3D, PropGon Academy, StraySpark 2026, CityGame, Frogames.
+## Paso 0 — Prerequisitos (una vez por sesión)
 
-Objetivo: malla que se vea AAA pero corra a 60fps. Regla de oro: **silueta primero, detalle después, optimización siempre**.
+1. Servidor Hunyuan3D local: `/home/carle/works/Hunyuan3D-2/start_server.sh` (arranca con `--enable_tex`; ~40 s con los modelos en caché). Verificar: `curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8081/docs` → `200`.
+2. Blender abierto con el addon Blender MCP conectado y `hunyuan3d_api_url = http://127.0.0.1:8081` en sus preferencias.
+3. ⚠️ El texturizado pica ~21 GB de RAM (offload a CPU): no lanzar otras cargas pesadas durante la generación.
 
-Output de este proyecto: raíz `W:\render3D\` (AGENTS.md §4). FBX/GLB + texturas + previews ahí.
+## Paso 1 — Generar el modelo con textura
 
-## 0. Preproducción (antes de abrir Blender)
+- Solo funciona **imagen→3D** (`input_image_url` con ruta absoluta). ⚠️ Texto→3D NO está disponible (el servidor tiene el pipeline texto→imagen desactivado a propósito; no intentar habilitarlo, no cabe en VRAM/RAM).
+- Llamar a `generate_hunyuan3d_model` (MCP blender) con la imagen de referencia. Tarda ~60 s con textura.
+- ⚠️ La llamada MCP puede dar *timeout*: la generación continúa en el servidor y normalmente el modelo aparece importado en Blender igualmente. Si no, el GLB está en `/home/carle/works/Hunyuan3D-2/gradio_cache/<uid>.glb` — importarlo a mano con `bpy.ops.import_scene.gltf`.
+- ⚠️ El mensaje "NETWORK ERROR DUE TO HIGH TRAFFIC" del servidor es genérico = cualquier error interno. Mirar `Hunyuan3D-2/server.log` para el traceback real. Si el proceso desapareció, fue OOM: revisar RAM/swap de WSL (`.wslconfig`).
 
-- Moodboard + referencias: frente/lateral/trasera, materiales, nivel de desgaste, ángulo principal de cámara.
-- Define: motor destino (Unity Y-up / Unreal Z-up + cm / Godot), plataforma (móvil/PC/consola), estilo (stylized vs PBR realista).
-- Presupuesto de tris (guía 2026, ajustar x0.25 móvil, x2-10 cinemática PC):
+## Paso 2 — Limpieza en Blender (orden crítico)
 
-| Tipo | Tris |
-|---|---|
-| Hero prop (arma, item clave) | 5.000–20.000 |
-| Prop entorno (caja, mueble) | 500–5.000 |
-| Fondo / distante | 100–1.000 |
-| Personaje completo | 15.000–80.000 |
-| Vehículo | 10.000–50.000 |
-| Muro/suelo modular | 100–2.000 |
+En modo Edición sobre el mesh importado:
 
-- Sin referencias claras no modelar: el prop sale sin carácter y rompe las fases siguientes.
+1. **Primero** soldar: seleccionar todo + `mesh.remove_doubles(threshold=0.0001)`. El mesh viene con los vértices duplicados por cara.
+2. **Después** borrar islas: componentes conexas por caras, conservar solo la mayor (`bmesh`, recorrer `link_faces`).
+3. ⚠️ Si se borran islas SIN soldar antes, cada cara es su propia isla y se elimina el modelo entero.
 
-## 1. Setup escena Blender
+## Paso 3 — Orientación (convención del juego)
 
-1. Units → Metric, `1 unidad = 1 metro`. Para UE5: o `Unit Scale 0.01` o `export scale 100` (elegir UNA y documentarla).
-2. Activa snapping + grid para modulares (incrementos 10/50/100 cm).
-3. Nomenclatura desde el día 1: `SM_Nombre_LOD0`, `UCX_Nombre` (colisión), `Nombre_L/_R` huesos.
-4. Guarda `.blend` versionado. Valida escala con cubo referencia 1×1×1 m.
+El modelo generado mira al lado contrario del que espera el juego (al caminar, se vería la cara). Girar 180° así:
 
-## 2. Blocking — silueta
+```python
+from mathutils import Matrix
+import math
+obj.matrix_world = Matrix.Rotation(math.pi, 4, 'Z') @ obj.matrix_world
+bpy.ops.object.transform_apply(rotation=True)
+```
 
-- Solo primitivas, sin detalle. Pregunta: ¿se reconoce a contraluz?
-- Hard-surface: Mirror (modela mitad) + Solidify (grosor chapas) + Array (repeticiones).
-- Modular: define kit base (muro 2m, esquina, suelo, techo, puerta) que encaje exacto, sin biseles que sobresalgan.
-- Origen/pivote: en borde de encaje para modulares, base-centro para props, pies-centro personajes.
+- ⚠️ NUNCA `obj.rotation_euler.z += math.pi`: la rotación de importación glTF (90° en X) hace que ese euler compuesto no sea un giro vertical limpio. Siempre matriz sobre el eje Z del mundo + apply.
+- ⚠️ En Babylon, los meshes importados de glTF traen `rotationQuaternion`: asignar `rotation.y` no tiene efecto sobre ellos (en pruebas in-page usar `rotationQuaternion.multiply(...)`).
 
-## 3. High-poly (detalle que se va a bakear)
+## Paso 4 — Guardar y publicar
 
-- Hard-surface: Boolean (Union/Difference) + Bevel controlado + Sub-D con creases.
-  - Bevel define material bajo luz: pequeño/duro = metal, grande/suave = plástico blando.
-  - Ngons OK en high plano, nunca en curva que se bakea.
-- Orgánico: Sculpt Mode (Dyntopo/Multires) o ZBrush → detalle arrugas, tornillos, costuras.
-- Regla: lo que ocupe <3-4 px en el bake es invisible — no lo моделить.
-- Mantén high y low alineados en el mismo espacio 3D.
+1. Exportar selección: `bpy.ops.export_scene.gltf(filepath=..., export_format='GLB', use_selection=True)` a `assets/<nombre>.glb` (fuente versionada). El aviso "Draco mesh compression is not available" es inofensivo.
+2. Copiar el mismo GLB a `public/models/<nombre>.glb` (Vite solo sirve `public/`, como `/models/...`).
+3. Guardar el `.blend` fuente en `assets/<nombre>.blend` — sin él, cerrar Blender pierde el trabajo de limpieza.
+4. Actualizar `assets/README.md` con la entrada del nuevo asset.
 
-## 4. Retopología / Low-poly (la que entra al motor)
+## Paso 5 — Integración en el juego
 
-- Manual (RetopoFlow / Quad Draw / poly-by-poly Blender): obligatoria en personajes y mallas que deforman. Cuida edge-loops en hombros, dedos, cara.
-- Auto (ZRemesher, Instant Meshes, QuadriFlow, Decimate Planar): válida para props estáticos y entorno.
-- IA (Meshy/Hyper3D/Rodin): buen punto de partida/prototipo; siempre cleanup después.
-- Checklist low:
-  - [ ] Quads dominantes, sin ngons en curvas, tris OK si sombreados bien
-  - [ ] `Merge by Distance`, normales `Recalculate Outside`
-  - [ ] `Ctrl+A → All Transforms` aplicado
-  - [ ] Sin interior faces, non-manifold, zero-area tris
-  - [ ] Polígonos donde la cámara los ve, no en caras planas/ocultas (traseras de pared → eliminar)
+- Los `*View.ts` cargan con `BABYLON.SceneLoader.ImportMeshAsync('', '/models/', '<nombre>.glb', scene)` y **siempre con fallback** a primitivas si la carga falla (ver `src/player/playerView.ts:_loadFarmer`).
+- Escalar y apoyar en el suelo con la caja envolvente real, nunca constantes a medida del modelo:
 
-## 5. UVs + Texel Density
+```ts
+const { min, max } = model.getHierarchyBoundingVectors(true);
+const escala = ALTURA_OBJETIVO / (max.y - min.y);
+model.scaling = new BABYLON.Vector3(escala, escala, escala);
+model.position.y = -min.y * escala;
+```
 
-1. Marca seams en zonas ocultas (axilas, detrás orejas, bordes naturales). `U → Unwrap`.
-2. Consistencia > aprovechamiento: misma densidad px/m en todas las islas. Verifica con Texel Density Checker + checker pattern.
-3. Empaqueta 0-1 sin solapes (salvo simetría intencional). Segundo canal UV1 lightmap solo si hay baked lighting.
-4. Resolución según pantalla: 512 props chicos, 1024/2048 entorno, 2048/4096 hero. Todas las islas proporcionales a su área 3D.
+- El modelo generado no trae rig ni animaciones; el código debe tolerar `animationGroups` vacío.
 
-## 6. Bake High → Low
+## Paso 6 — Verificación
 
-- En Blender: low con nodo Image Texture creado, Render Properties → Bake (Normals, AO, Diffuse, Curvature vía cage).
-- O Substance Painter / Marmoset / xNormal (gratis).
-- Claves: cage + distancia de rayos ajustada, IDs de material por superficie, low y high solapadas.
-- Si hay artefactos: revisa retopo y UVs primero, no subas resolución a lo loco.
-- Para LOD2+ rebakea normal map propio, no reutilices el de LOD0.
-
-## 7. Texturizado PBR
-
-- Stack: Albedo/BaseColor + Metallic + Roughness + Normal (baked) + AO.
-- En Blender: `Principled BSDF`. En Substance: base materials → desgaste lógico con curvature/AO → storytelling (óxido, huellas donde tiene sentido, no decorativo).
-- Tilable + shared materials en modulares (menos draw calls). Evita 1 material por módulo.
-- FBX no lleva materiales fiables al motor: exporta geometría+UVs, reconstruye material en Unity/Unreal.
-
-## 8. LODs + Colisión
-
-LODs (no-Nanite / Unity / Godot / skeletal):
-- LOD0 100%, LOD1 ~50%, LOD2 ~25%, LOD3 ~10% (billboard 2 tris a 80m+).
-- Blender: Decimate Collapse (orgánico) / Planar (hard-surface plano), con Triangulate activado para ver budget real. Multires: exporta cada nivel de subdivisión.
-- Nombra `Nombre_LOD0/1/2/3` bajo empty padre `Nombre` → Unity/UE autodetectan cadena LOD.
-- Nanite (UE5 static opaco): puedes saltar retopo/LOD manual; no sirve para skeletal, foliage denso con masked, ni animados.
-
-Colisión:
-- Duplica low → simplifica drástico (`Decimate` o box/capsule/convex). Objeto separado `UCX_Nombre`.
-- En UE desactiva Auto Generate Collision si usas UCX propia.
-
-## 9. Rig (solo deformables)
-
-- Huesos mínimos viables (cada hueso cuesta en motor). Jerarquía acorde a anatomía.
-- Weight Paint cuidadoso en articulaciones. IK en extremidades.
-- Atajo: Mixamo para humanoides.
-- Testea en Blender `Alt+A` / NLA antes de exportar.
-
-## 10. Export FBX / GLB
-
-Blender → File → Export → FBX:
-- UE5: `Forward -Y, Up Z Up, Apply Transform ON, Apply Scalings FBX All, Scale 1.0 (escena m) o 100 según setup §1, Smoothing Face, solo Mesh+Armature`.
-- Unity: `Forward -Z, Up Y Up, Apply Transform ON`. En Unity deja Scale Factor 1.0 y Transform (1,1,1) limpio — si sale 100x o rotado -90°X, el fix va en Blender, no por asset.
-- Godot/web/móvil: prefiere GLB/glTF (PBR más limpio que FBX).
-- OBJ solo estáticos sin animación.
-- Colecciones modulares: export individual, `Combine Meshes OFF` en UE.
-
-Checklist pre-export (12 puntos):
-1. Sin ngons 2. Vértices merged 3. Normales fuera 4. Escala aplicada 5. Origen correcto 6. UVs completos 7. Principled con valores plausibles 8. Nombres LOD/UCX 9. Colisión separada 10. LODs generados 11. Mapas bakeados a resolución correcta 12. Test cubo referencia OK
-
-## 11. Import + validación en motor
-
-- UE5: importa LOD0, luego Static Mesh Editor → LOD Import LOD1/2/3, Screen Size 1.0/0.5/0.25/0.1, `stat unit` + LOD Coloration, Dithered transition anti-pop.
-- Unity: prefab con LODGroup auto, Frame Debugger para tris por objeto.
-- Lumen se ve distinto a EEVEE: reajusta roughness/metallic en motor con luz similar a escena final.
-- Errores típicos: escala mal (sombras/colisiones rotas) → unificar §1; TD inconsistente → rehacer UV antes del bake; desgaste ilógico; pivote mal → no encaja modular.
-
-## 12. Troubleshooting rápido
-
-- Bake con manchas → cage/distancia rayos, high/low desalineados.
-- Textura estirada → seams + TD checker.
-- FBX gigante/rotado → Apply Transforms + Forward/Up según motor.
-- OOM en bake → baja texture_size antes que view_size.
-- Pop LOD → sube threshold screen 10% cada vez, shadow LOD = LOD1/2.
-- IA mesh (50-500K tris, sin UV, vertex colors) → cleanup: merge distance, QuadriFlow a budget, auto-UV, rebake PBR, LODs, export.
-
-## 13. Receta mínima viable (prop simple sin sculpt)
-
-Blocking → Low directo → UV → PBR procedural bakeado → LOD1/2 Decimate → UCX box → FBX → importa + valida escala/material. Horas, no días.
-
-ARGUMENTS: tipo asset (prop/personaje/modular) + motor destino + plataforma + budget tris + con/sin rig.
+1. `pnpm verify` (format + lint + typecheck + tests) en verde.
+2. Prueba visual real: `pnpm dev`, abrir http://localhost:5173 con el skill `agent-browser` y captura de pantalla. Para simular teclas mantenidas:
+   `agent-browser eval "window.dispatchEvent(new KeyboardEvent('keydown', {key:'w'})); setTimeout(() => window.dispatchEvent(new KeyboardEvent('keyup', {key:'w'})), 1500); 'ok'"`
+3. Para un personaje: al caminar hacia delante (W) debe verse la espalda; si se ve la cara, volver al Paso 3.

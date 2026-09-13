@@ -13,6 +13,8 @@ interface FarmTile {
   x: number;
   z: number;
   cropMeshes: any[];
+  modelRoot: any | null;
+  modelMaterials: any[];
 }
 
 export class FarmView {
@@ -63,12 +65,80 @@ export class FarmView {
         mesh.material = this.soilMat;
         mesh.receiveShadows = true;
         // Sin impostor físico: el jugador puede caminar sobre los surcos
-        this.tiles.push({ mesh, x, z, cropMeshes: [] });
+        this.tiles.push({ mesh, x, z, cropMeshes: [], modelRoot: null, modelMaterials: [] });
       }
     }
 
     bus.on(EVENTS.FARM_CHANGED, () => this.sync());
     this.sync();
+    void this.loadTileModel();
+  }
+
+  // Descarga el módulo de tierra una sola vez y crea un clon por surco. Las
+  // cajas siguen siendo el respaldo si el GLB o el cargador no están disponibles.
+  async loadTileModel(): Promise<void> {
+    let imported: any = null;
+    const roots: any[] = [];
+    try {
+      imported = await BABYLON.SceneLoader.ImportMeshAsync(
+        '',
+        '/models/',
+        'parcela_plantacion.glb',
+        this.scene,
+      );
+      const template = imported.meshes[0];
+      if (!template || !imported.meshes.some((m: any) => m.getTotalVertices() > 0)) {
+        throw new Error('Parcela sin malla');
+      }
+
+      // No se presupone la escala ni el origen del GLB: se ajusta desde su caja
+      // real para que el módulo cubra exactamente tileSize en el plano XZ.
+      const { min, max } = template.getHierarchyBoundingVectors(true);
+      const span = Math.max(max.x - min.x, max.z - min.z);
+      if (span <= 0) throw new Error('Parcela sin dimensiones horizontales');
+      const scale = this.cfg.tileSize / span;
+
+      for (let i = 0; i < this.tiles.length; i++) {
+        const tile = this.tiles[i];
+        const root = new BABYLON.TransformNode(`soil_model_${i}`, this.scene);
+        root.scaling.set(scale, scale, scale);
+        root.position.set(
+          tile.x - ((min.x + max.x) / 2) * scale,
+          -min.y * scale,
+          tile.z - ((min.z + max.z) / 2) * scale,
+        );
+        template.instantiateHierarchy(
+          root,
+          { doNotInstantiate: true },
+          (source: any, clone: any) => {
+            clone.setEnabled(true);
+            clone.receiveShadows = true;
+            if (source.material) {
+              const material = source.material.clone(
+                `soil_model_mat_${i}_${tile.modelMaterials.length}`,
+              );
+              clone.material = material;
+              tile.modelMaterials.push(material);
+            }
+          },
+        );
+        tile.modelRoot = root;
+        roots.push(root);
+      }
+
+      for (const mesh of imported.meshes) mesh.setEnabled(false);
+      for (const tile of this.tiles) {
+        tile.mesh.dispose();
+        tile.mesh = null;
+      }
+      this.sync();
+    } catch {
+      for (const root of roots) root.dispose(false, true);
+      if (imported) {
+        for (const mesh of imported.meshes) mesh.dispose(false, true);
+      }
+      // fallback: se quedan las cajas de tierra
+    }
   }
 
   makeMat(r: number, g: number, b: number): any {
@@ -100,7 +170,8 @@ export class FarmView {
     for (const m of t.cropMeshes) m.dispose();
     t.cropMeshes = [];
     const crop = status.crop;
-    t.mesh.material = crop && crop.watered ? this.soilWetMat : this.soilMat;
+    if (t.mesh) t.mesh.material = crop && crop.watered ? this.soilWetMat : this.soilMat;
+    this.setTileWetness(t, Boolean(crop?.watered));
     if (!crop) return;
 
     const add = (mesh: any) => {
@@ -149,6 +220,16 @@ export class FarmView {
         fruit.position.set(t.x + ox, 0.12 + h * oy, t.z + oz);
         fruit.material = mat;
       }
+    }
+  }
+
+  // Cada instancia recibe su propio material al clonar. Así solo se oscurece
+  // la parcela regada, sin alterar las demás ni perder el atlas PBR del GLB.
+  setTileWetness(tile: FarmTile, watered: boolean): void {
+    const tone = watered ? new BABYLON.Color3(0.58, 0.58, 0.64) : BABYLON.Color3.White();
+    for (const material of tile.modelMaterials) {
+      if (material.albedoColor) material.albedoColor = tone;
+      else if (material.diffuseColor) material.diffuseColor = tone;
     }
   }
 
