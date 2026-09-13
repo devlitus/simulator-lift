@@ -27,8 +27,23 @@ Contenido binario del juego: modelos `.glb`, texturas y audio.
   sin borrar nada), con la cara girada de -Y a +Y (convención del juego) y
   los pies en z=0 (~1.96 de alto; la vista lo escala a ~1.5 m por caja
   envolvente). SIN rig ni animaciones (Marta no patrulla). Es el que sirve
-  el juego en `public/models/marta.glb`. Fuentes editables:
-  `assets/marta.blend` (malla limpia) y `assets/marta_referencia.png`.
+   el juego en `public/models/marta.glb`. Fuentes editables:
+   `assets/marta.blend` (malla limpia) y `assets/marta_referencia.png`.
+- `models/lila.glb` — modelo 3D de Lila (la florista) generado con
+  Hunyuan3D-2 (servidor local, imagen→3D con textura) a partir de
+  `assets/lila_referencia.png` (imagen generada con ComfyUI en Windows,
+  workflow `image_z_image_turbo_int8`: Z-Image-Turbo, estilo chibi como
+  Marta pero con peto verde y flor roja en el pelo). Limpio (vértices
+  soldados 25k→20k, una sola isla de ~40k caras, sin borrar nada), con la
+  cara girada de -Y a +Y (convención del juego) y los pies en z=0 (~1.96
+  de alto; la vista lo escala a ~1.5 m por caja envolvente). SIN rig ni
+  animaciones (se desplaza con el root como las primitivas). Es el que
+  sirve el juego en `public/models/lila.glb`. Fuentes editables:
+  `assets/lila.blend` (malla limpia) y `assets/lila_referencia.png`.
+  Rig y animación (`assets/lila_rig.blend`, script `~/blender-mcp/lila/rig_walk.py`):
+  armature humanoide de 19 huesos con pesos procedurales, walk (1 s) e idle
+  (2 s) como pistas NLA; la vista alterna walk/idle al patrullar. Membranas
+  entre botas y espinillas eliminadas (se estiraban al andar).
 - `models/gallina.glb` — modelo 3D de la gallina generado con Hunyuan3D-2
   (servidor local, imagen→3D con textura 2048×2048) a partir de
   `assets/gallina_referencia.png` (imagen generada con ComfyUI en Windows,
