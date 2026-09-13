@@ -136,6 +136,16 @@ Contenido binario del juego: modelos `.glb`, texturas y audio.
   como punto de venta (interactuable de `worldView.sellBin`). Fuentes
   editables: `assets/puesto_ventas.blend` (malla limpia) y
   `assets/puesto_ventas_referencia.png`.
+- `tienda_marta.glb` — tienda de semillas de Marta, generada con Hunyuan3D-2
+  a partir de `assets/tienda_marta_referencia.png`, una referencia creada con
+  generación de imagen. Tiene atlas de textura integrado con madera, estuco
+  rosa, tejas de terracota y toldo; la malla se soldó (29.278→19.726
+  vértices), se descartó una isla flotante de 320 caras, se giró 180° sobre el
+  eje vertical y se centró con la base en el origen (~1,95×1,70×1,97 unidades).
+  Es un edificio estático, sin rig. La fuente editable es
+  `assets/tienda_marta.blend`; se sirve como
+  `public/models/tienda_marta.glb` y `WorldView` conserva una colisión y un
+  fallback de primitivas si falla la carga.
 
 ## Cómo se publican los modelos
 
