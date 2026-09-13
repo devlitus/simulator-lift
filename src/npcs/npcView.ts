@@ -21,6 +21,8 @@ interface NpcInstance {
   wpIndex: number;
   wpDir: number;
   speed: number;
+  anims?: { walk?: any; idle?: any };
+  animActual?: string | null;
 }
 
 export class NPCSystemView {
@@ -96,9 +98,10 @@ export class NPCSystemView {
     acc.parent = root;
 
     const primitivas = [body, head, acc];
-    // Marta tiene modelo 3D propio (assets/models/marta.glb, publicado en
-    // /models/); el resto de NPCs sigue con primitivas por ahora.
-    if (def.id === 'marta') this._loadMarta(world, root, primitivas);
+    // Marta y Lila tienen modelo 3D propio (assets/models/*.glb, publicados
+    // en /models/); Gon sigue con primitivas por ahora.
+    if (def.id === 'marta') this._loadNpcModel(world, root, primitivas, 'marta.glb');
+    else if (def.id === 'lila') this._loadNpcModel(world, root, primitivas, 'lila.glb');
 
     return {
       def,
@@ -112,19 +115,19 @@ export class NPCSystemView {
     };
   }
 
-  // Carga el modelo 3D de Marta (assets/models/marta.glb, publicado en
+  // Carga el modelo 3D de un NPC (assets/models/*.glb, publicado en
   // /models/). Si falla (sin red, asset ausente, loaders no cargados) se
-  // queda con las primitivas de siempre. El modelo no trae rig ni
-  // animaciones (Marta no patrulla: se queda en su tienda), así que no se
-  // espera ningún grupo de animación.
-  private async _loadMarta(world: WorldView, root: any, primitivas: any[]): Promise<void> {
+  // queda con las primitivas de siempre. Lila trae rig con walk/idle
+  // (pistas NLA): se alternan según patrulle o esté parada, como el
+  // granjero; Marta es estática y no trae animaciones.
+  private async _loadNpcModel(
+    world: WorldView,
+    root: any,
+    primitivas: any[],
+    file: string,
+  ): Promise<void> {
     try {
-      const res = await BABYLON.SceneLoader.ImportMeshAsync(
-        '',
-        '/models/',
-        'marta.glb',
-        this.scene,
-      );
+      const res = await BABYLON.SceneLoader.ImportMeshAsync('', '/models/', file, this.scene);
       const model = res.meshes[0];
       // Se escala a la altura del NPC de primitivas (~1.5 m) y se apoya en
       // el suelo a partir de la caja envolvente real del modelo, como el
@@ -137,10 +140,42 @@ export class NPCSystemView {
       for (const m of res.meshes) {
         if (m.getTotalVertices() > 0) world.addShadow(m);
       }
+      this._cargarAnimaciones(root, res.animationGroups ?? []);
       for (const p of primitivas) p.dispose();
     } catch {
       // fallback: se quedan las primitivas
     }
+  }
+
+  // Recoge walk/idle del GLB y arranca en idle en bucle (patrón playerView).
+  // Sin grupos (Marta, o fallback), el NPC se mueve sin animar, como antes.
+  private _cargarAnimaciones(root: any, grupos: any[]): void {
+    const npc = this.npcs.find((n) => n.root === root);
+    if (!npc) return;
+    npc.anims = {};
+    npc.animActual = null;
+    for (const g of grupos) {
+      const nombre = (g.name ?? '').toLowerCase();
+      if (nombre.includes('walk')) npc.anims.walk = g;
+      else if (nombre.includes('idle')) npc.anims.idle = g;
+      g.stop();
+    }
+    if (npc.anims.idle) {
+      npc.anims.idle.start(true);
+      npc.animActual = 'idle';
+    }
+  }
+
+  // Alterna walk/idle según se mueva; sin transiciones (estilo cartoon).
+  private _animar(npc: NpcInstance, moviendo: boolean): void {
+    if (!npc.anims) return;
+    const siguiente = moviendo ? 'walk' : 'idle';
+    if (siguiente === npc.animActual) return;
+    const grupo = npc.anims[siguiente as 'walk' | 'idle'];
+    if (!grupo) return;
+    if (npc.animActual) npc.anims[npc.animActual as 'walk' | 'idle']?.stop();
+    grupo.start(true);
+    npc.animActual = siguiente;
   }
 
   // Movimiento por waypoints (ida y vuelta)
@@ -157,12 +192,14 @@ export class NPCSystemView {
           npc.wpDir *= -1;
           npc.wpIndex += npc.wpDir * 2;
         }
+        this._animar(npc, false);
         continue;
       }
       const step = Math.min(npc.speed * dt, dist);
       npc.root.position.x += (dx / dist) * step;
       npc.root.position.z += (dz / dist) * step;
       npc.root.rotation.y = Math.atan2(dx, dz);
+      this._animar(npc, true);
     }
   }
 
