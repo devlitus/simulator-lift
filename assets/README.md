@@ -19,6 +19,16 @@ Contenido binario del juego: modelos `.glb`, texturas y audio.
   enviados a Blender con `~/blender-mcp/bcmd.py`).
 - `granjero_original.glb` — copia del modelo original sin texturizar ni recortar
   la peana (respaldo).
+- `models/marta.glb` — modelo 3D de Marta (la tendera) generado con
+  Hunyuan3D-2 (servidor local, imagen→3D con textura 2048×2048) a partir de
+  `assets/marta_referencia.png` (imagen generada con ComfyUI en Windows,
+  workflow `image_z_image_turbo_int8`: Z-Image-Turbo, estilo chibi como el
+  granjero). Limpio (vértices soldados 25k→20k, una sola isla de ~40k caras,
+  sin borrar nada), con la cara girada de -Y a +Y (convención del juego) y
+  los pies en z=0 (~1.96 de alto; la vista lo escala a ~1.5 m por caja
+  envolvente). SIN rig ni animaciones (Marta no patrulla). Es el que sirve
+  el juego en `public/models/marta.glb`. Fuentes editables:
+  `assets/marta.blend` (malla limpia) y `assets/marta_referencia.png`.
 - `models/gallina.glb` — modelo 3D de la gallina generado con Hunyuan3D-2
   (servidor local, imagen→3D con textura 2048×2048) a partir de
   `assets/gallina_referencia.png` (imagen generada con ComfyUI en Windows,
