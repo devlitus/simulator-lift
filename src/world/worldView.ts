@@ -44,10 +44,10 @@ export class WorldView {
       this.shadow.usePercentageCloserFiltering = true;
     }
 
-    // Punto de venta: delante del mostrador del puesto de ventas, al este
-    // del almacén (main.ts lo usa como interactuable). La puerta del
-    // almacén ya no es interactuable: la sustituye el puesto.
-    this.sellBin = { x: 16.3, z: 6.9 };
+    // Punto de venta: delante del mostrador del puesto, junto al lado sur del
+    // almacén y mirando a las parcelas (main.ts lo usa como interactuable).
+    // La puerta del almacén ya no es interactuable: la sustituye el puesto.
+    this.sellBin = { x: 11.6, z: 8 };
 
     this.buildGround();
     this.buildBounds();
@@ -178,27 +178,106 @@ export class WorldView {
   }
 
   buildBuildings(): void {
-    this.buildHouse(12, -8, this.mat(0.85, 0.55, 0.65)); // Tienda de Marta (rosa)
+    this.buildMartaShop();
     this.buildHouse(-14, -10, this.mat(0.55, 0.56, 0.6)); // Forja de Gon (gris)
     this.buildHouse(4, -18, this.mat(0.5, 0.72, 0.5)); // Casa de Lila (verde)
     this.buildStorage(); // Almacén del granjero, al este de la parcela
-    this.buildSalesStand(); // Puesto de ventas, al este del almacén
+    this.buildSalesStand(); // Puesto de ventas, junto al almacén y frente a la parcela
+  }
 
-    // Escaparate de la tienda (mostrador)
-    const counter = BABYLON.MeshBuilder.CreateBox(
-      'counter',
-      { width: 2.6, height: 1, depth: 1 },
+  // Tienda de Marta: modelo GLB texturizado con una casa y escaparate de
+  // respaldo. La colisión es independiente, para no depender de la malla
+  // importada ni dejar que el jugador atraviese el edificio durante la carga.
+  buildMartaShop(): void {
+    const x = 12;
+    const z = -8;
+    const hit = BABYLON.MeshBuilder.CreateBox(
+      'martaShopHit',
+      { width: 4.7, height: 4.8, depth: 4.2 },
       this.scene,
     );
-    counter.position.set(11, 0.5, -5);
-    counter.material = this.mat(0.55, 0.35, 0.18);
-    counter.physicsImpostor = new BABYLON.PhysicsImpostor(
-      counter,
+    hit.position.set(x, 2.4, z);
+    hit.isVisible = false;
+    hit.physicsImpostor = new BABYLON.PhysicsImpostor(
+      hit,
       BABYLON.PhysicsImpostor.BoxImpostor,
       { mass: 0 },
       this.scene,
     );
+
+    const root = new BABYLON.TransformNode('martaShopRoot', this.scene);
+    root.position.set(x, 0, z);
+    const prims: any[] = [];
+
+    const base = BABYLON.MeshBuilder.CreateBox(
+      'martaShopBase',
+      { width: 4.4, height: 3, depth: 4.4 },
+      this.scene,
+    );
+    base.parent = root;
+    base.position.y = 1.5;
+    base.material = this.mat(0.85, 0.55, 0.65);
+    base.receiveShadows = true;
+    this.addShadow(base);
+    prims.push(base);
+
+    const roof = BABYLON.MeshBuilder.CreateCylinder(
+      'martaShopRoof',
+      { diameterTop: 0, diameterBottom: 6.2, height: 2.2, tessellation: 4 },
+      this.scene,
+    );
+    roof.parent = root;
+    roof.position.y = 4.1;
+    roof.rotation.y = Math.PI / 4;
+    roof.material = this.mat(0.55, 0.22, 0.18);
+    this.addShadow(roof);
+    prims.push(roof);
+
+    const door = BABYLON.MeshBuilder.CreateBox(
+      'martaShopDoor',
+      { width: 1, height: 1.8, depth: 0.15 },
+      this.scene,
+    );
+    door.parent = root;
+    door.position.set(0, 0.9, 2.25);
+    door.material = this.mat(0.35, 0.22, 0.1);
+    prims.push(door);
+
+    const counter = BABYLON.MeshBuilder.CreateBox(
+      'martaShopCounter',
+      { width: 2.6, height: 1, depth: 1 },
+      this.scene,
+    );
+    counter.parent = root;
+    counter.position.set(-1, 0.5, 3);
+    counter.material = this.mat(0.55, 0.35, 0.18);
     this.addShadow(counter);
+    prims.push(counter);
+
+    this._loadMartaShop(root, prims);
+  }
+
+  private async _loadMartaShop(root: any, prims: any[]): Promise<void> {
+    try {
+      const res = await BABYLON.SceneLoader.ImportMeshAsync(
+        '',
+        '/models/',
+        'tienda_marta.glb',
+        this.scene,
+      );
+      const model = res.meshes[0];
+      const { min, max } = model.getHierarchyBoundingVectors(true);
+      const escala = 4.8 / (max.y - min.y);
+      model.parent = root;
+      model.scaling = new BABYLON.Vector3(escala, escala, escala);
+      model.position.y = -min.y * escala;
+      for (const mesh of res.meshes) {
+        if (mesh.getTotalVertices() > 0) this.addShadow(mesh);
+      }
+      for (const prim of prims) prim.dispose();
+    } catch {
+      // Fallback: la casa y el mostrador de primitivas permanecen visibles.
+    }
   }
 
   // Almacén del granjero: modelo GLB (assets/almacen.glb, publicado en
@@ -303,28 +382,26 @@ export class WorldView {
   }
 
   // Puesto de ventas: modelo GLB (assets/puesto_ventas.glb, publicado en
-  // /models/) con fallback a primitivas si falla la carga. Va al este del
-  // almacén, con el mostrador mirando al sur (+z), hacia el espacio abierto
-  // por el que se acerca el granjero. El GLB mide ~1.96×1.94×1.21 (la vista
-  // lo escala a ~1.9 de alto): es ancho y poco profundo, con el mostrador en
-  // la cara -z del archivo (como la puerta del almacén). El cargador glTF
-  // de Babylon ya aplica el giro de conversión de sistema de coordenadas en
-  // el contenedor del modelo, así que el root se deja sin rotación: el
-  // mostrador queda mirando al sur. Sustituye a la puerta del almacén como
-  // punto de venta: sellBin queda delante del mostrador (main.ts no cambia).
+  // /models/) con fallback a primitivas si falla la carga. Va junto al lado
+  // sur del almacén, con el mostrador mirando al oeste (-x), hacia las
+  // parcelas. El GLB mide ~1.96×1.94×1.21 (la vista lo escala a ~1.9 de
+  // alto): es ancho y poco profundo, con el mostrador en su cara frontal.
+  // La rotación -π/2 en Y lleva la fachada local +z hacia el oeste. Sustituye
+  // a la puerta del almacén como punto de venta: sellBin queda delante del
+  // mostrador (main.ts no cambia).
   buildSalesStand(): void {
-    const x = 16.3;
-    const z = 5;
+    const x = 13.5;
+    const z = 8;
 
     // Colisión fija (independiente del modelo): caja invisible que cubre el
-    // volumen del puesto (~1.9×1.9×1.2 tras el escalado de la vista). El
-    // mostrador queda en la cara norte (z≈5): el cuerpo va de z≈5 a z≈6.2.
+    // volumen del puesto (~1.2×1.9×1.9 tras el giro). El mostrador queda en
+    // la cara oeste y el cuerpo se extiende hacia el este, junto al almacén.
     const hit = BABYLON.MeshBuilder.CreateBox(
       'salesStandHit',
-      { width: 2.0, height: 2.0, depth: 1.4 },
+      { width: 1.4, height: 2.0, depth: 2.0 },
       this.scene,
     );
-    hit.position.set(x, 1.0, 5.6);
+    hit.position.set(x - 0.6, 1.0, z);
     hit.isVisible = false;
     hit.physicsImpostor = new BABYLON.PhysicsImpostor(
       hit,
@@ -333,13 +410,13 @@ export class WorldView {
       this.scene,
     );
 
-    // Nodo raíz sin rotación: el cargador glTF ya orienta el contenedor
-    // (giro π de conversión), dejando el mostrador mirando al sur.
+    // El frente local +z del GLB rota al oeste, hacia las parcelas.
     const root = new BABYLON.TransformNode('salesStandRoot', this.scene);
     root.position.set(x, 0, z);
+    root.rotation.y = -Math.PI / 2;
 
-    // Primitivas de respaldo, con el estilo del resto del pueblo (en
-    // espacio local: el mostrador hacia +z, como queda el GLB cargado)
+    // Primitivas de respaldo, con el estilo del resto del pueblo. El
+    // mostrador local +z hereda el giro del root y también mira a la parcela.
     const prims: any[] = [];
     const counter = BABYLON.MeshBuilder.CreateBox(
       'salesStandCounter',
