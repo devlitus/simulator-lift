@@ -115,6 +115,15 @@ Contenido binario del juego: modelos `.glb`, texturas y audio.
   workflow, mapas y preview en [`assets/pozo/`](pozo/README.md).
   Se sirve como `public/models/pozo.glb`, con colisión independiente y
   respaldo de primitivas si falla la carga.
+- `parcela_plantacion.glb` — módulo de tierra arada con marco bajo de madera,
+  generado desde `assets/parcela/parcela_plantacion_referencia.png` en
+  ComfyUI (Z-Image-Turbo, 4 pasos) y convertido a 3D texturizado con
+  Hunyuan3D-2. Limpio (vértices soldados, una isla), optimizado a 1.800
+  triángulos, con huella de 1,3 m y base en z=0. Fuente editable:
+  `assets/parcela_plantacion.blend`; workflow y referencia en
+  `assets/parcela/`. Se publica como `public/models/parcela_plantacion.glb`
+  y `FarmView` lo clona para las 24 casillas, manteniendo las cajas como
+  respaldo si la carga falla.
 - `puesto_ventas.glb` — modelo 3D del puesto de ventas del granjero generado
   con Hunyuan3D-2 (servidor local, imagen→3D con textura 2048×2048) a partir
   de `assets/puesto_ventas_referencia.png` (imagen generada con ComfyUI en
