@@ -14,7 +14,7 @@ export interface GameState {
   produce: Record<string, number>;
   gifts: Record<string, number>;
   feed: number; // pienso disponible para alimentar animales
-  animalProducts: Record<string, number>; // productos de granja por especie (leche, lana…)
+  animalProducts: Record<string, number>; // productos de granja por especie (huevos, leche, lana…)
   selectedSeed: string;
   /** puntos de amistad por id de NPC */
   friendships: Record<string, number>;
