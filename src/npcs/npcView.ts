@@ -95,6 +95,11 @@ export class NPCSystemView {
     }
     acc.parent = root;
 
+    const primitivas = [body, head, acc];
+    // Marta tiene modelo 3D propio (assets/models/marta.glb, publicado en
+    // /models/); el resto de NPCs sigue con primitivas por ahora.
+    if (def.id === 'marta') this._loadMarta(world, root, primitivas);
+
     return {
       def,
       id: def.id,
@@ -105,6 +110,37 @@ export class NPCSystemView {
       wpDir: 1,
       speed: 1.2,
     };
+  }
+
+  // Carga el modelo 3D de Marta (assets/models/marta.glb, publicado en
+  // /models/). Si falla (sin red, asset ausente, loaders no cargados) se
+  // queda con las primitivas de siempre. El modelo no trae rig ni
+  // animaciones (Marta no patrulla: se queda en su tienda), así que no se
+  // espera ningún grupo de animación.
+  private async _loadMarta(world: WorldView, root: any, primitivas: any[]): Promise<void> {
+    try {
+      const res = await BABYLON.SceneLoader.ImportMeshAsync(
+        '',
+        '/models/',
+        'marta.glb',
+        this.scene,
+      );
+      const model = res.meshes[0];
+      // Se escala a la altura del NPC de primitivas (~1.5 m) y se apoya en
+      // el suelo a partir de la caja envolvente real del modelo, como el
+      // granjero (playerView): sin constantes a medida del .glb.
+      const { min, max } = model.getHierarchyBoundingVectors(true);
+      const escala = 1.5 / (max.y - min.y);
+      model.parent = root;
+      model.scaling = new BABYLON.Vector3(escala, escala, escala);
+      model.position.y = -min.y * escala;
+      for (const m of res.meshes) {
+        if (m.getTotalVertices() > 0) world.addShadow(m);
+      }
+      for (const p of primitivas) p.dispose();
+    } catch {
+      // fallback: se quedan las primitivas
+    }
   }
 
   // Movimiento por waypoints (ida y vuelta)
