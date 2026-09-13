@@ -344,22 +344,80 @@ export class WorldView {
     for (const [x, z] of spots) this.buildTree(x, z);
   }
 
-  buildDecor(): void {
-    // Pozo decorativo en la plaza
-    const well = BABYLON.MeshBuilder.CreateCylinder(
-      'well',
-      { height: 1, diameter: 1.6 },
+  // Pozo de la plaza: colisión estable durante la carga y si falla el GLB.
+  buildWell(): void {
+    const root = new BABYLON.TransformNode('wellRoot', this.scene);
+    root.position.set(-3, 0.04, -4); // Apoyado sobre el camino de la plaza.
+
+    const hit = BABYLON.MeshBuilder.CreateBox(
+      'wellHit',
+      { width: 1.6, height: 1, depth: 1.6 },
       this.scene,
     );
-    well.position.set(-3, 0.5, -4);
-    well.material = this.mat(0.55, 0.55, 0.58);
-    well.physicsImpostor = new BABYLON.PhysicsImpostor(
-      well,
+    hit.position.set(-3, 0.54, -4);
+    hit.isVisible = false;
+    hit.physicsImpostor = new BABYLON.PhysicsImpostor(
+      hit,
       BABYLON.PhysicsImpostor.BoxImpostor,
       { mass: 0 },
       this.scene,
     );
+
+    const well = BABYLON.MeshBuilder.CreateCylinder(
+      'wellFallback',
+      { height: 1, diameter: 1.6 },
+      this.scene,
+    );
+    well.parent = root;
+    well.position.y = 0.5;
+    well.material = this.mat(0.55, 0.55, 0.58);
+    well.receiveShadows = true;
     this.addShadow(well);
+    void this._loadWell(root, well);
+  }
+
+  private async _loadWell(root: any, fallback: any): Promise<void> {
+    let imported: any = null;
+    try {
+      imported = await BABYLON.SceneLoader.ImportMeshAsync('', '/models/', 'pozo.glb', this.scene);
+      const model = imported.meshes[0];
+      const lod0 = imported.meshes.find((m: any) => m.name === 'SM_Pozo_LOD0');
+      if (!model || !lod0 || lod0.getTotalVertices() === 0) throw new Error('Pozo sin malla');
+
+      const { min, max } = model.getHierarchyBoundingVectors(true);
+      const height = max.y - min.y;
+      if (!Number.isFinite(height) || height <= 0) throw new Error('Pozo sin dimensiones');
+      const scale = 2.2 / height;
+      model.parent = root;
+      // Conservar el signo de la escala del root glTF (conversión de ejes).
+      model.scaling.scaleInPlace(scale);
+      model.position.set(
+        (-(min.x + max.x) / 2) * scale,
+        -min.y * scale,
+        (-(min.z + max.z) / 2) * scale,
+      );
+
+      for (const [name, distance] of [
+        ['SM_Pozo_LOD1', 22],
+        ['SM_Pozo_LOD2', 38],
+      ] as const) {
+        const lod = imported.meshes.find((m: any) => m.name === name);
+        if (lod) lod0.addLODLevel(distance, lod);
+      }
+      for (const mesh of imported.meshes) mesh.receiveShadows = true;
+      this.addShadow(lod0);
+      this.shadow?.removeShadowCaster(fallback);
+      fallback.dispose(false, true);
+    } catch {
+      // El respaldo y su colisión siguen disponibles incluso con un GLB inválido.
+      if (imported) {
+        for (const mesh of imported.meshes) mesh.dispose(false, true);
+      }
+    }
+  }
+
+  buildDecor(): void {
+    this.buildWell();
 
     // La antigua caja de ventas ya no existe: la sustituye el almacén del
     // granjero (buildStorage), que ocupa su lugar al este de la parcela.
