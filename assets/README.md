@@ -167,6 +167,16 @@ Contenido binario del juego: modelos `.glb`, texturas y audio.
   `public/models/tienda_marta.glb` y `WorldView` conserva una colisión y un
   fallback de primitivas si falla la carga.
 
+- `models/baldosa_camino_01.glb`, `models/baldosa_camino_02.glb` y
+  `models/baldosa_camino_03.glb` — tres variantes de piedra arenisca
+  texturizada para los caminos, generadas con Hunyuan3D local desde una
+  referencia de Z-Image-Turbo. Cada una tiene 500 triángulos y textura de
+  1024×1024; huella de 0,98 m y relieve de 0,035 m. `WorldView` reutiliza
+  las mallas y materiales en 126 instancias, con juntas de tierra y cruce
+  sin superposiciones. Fuente editable: `assets/baldosas_camino.blend`;
+  referencia, workflow y script en [`assets/camino/`](camino/README.md).
+  Las copias servidas están en `public/models/`.
+
 ## Cómo se publican los modelos
 
 Vite solo publica lo que hay en `public/`, así que los `.glb` que usa el juego

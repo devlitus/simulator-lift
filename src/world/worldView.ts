@@ -7,6 +7,14 @@ import { CONFIG } from '../core/constants';
 import { EVENTS, EventBus } from '../core/events';
 import type { PenConfig } from '../../data/schemas';
 
+interface PathTile {
+  x: number;
+  z: number;
+  width: number;
+  depth: number;
+  variant: number;
+}
+
 export class WorldView {
   scene: any;
   bus: EventBus;
@@ -113,7 +121,7 @@ export class WorldView {
     }
   }
 
-  // Caminos de tierra decorativos
+  // Tierra entre las baldosas; el terreno sigue siendo la superficie física.
   buildPaths(): void {
     const sand = this.mat(0.78, 0.7, 0.52);
     const p1 = BABYLON.MeshBuilder.CreateBox(
@@ -132,6 +140,121 @@ export class WorldView {
     p2.position.set(-1, 0.02, -4);
     p2.material = sand;
     p2.receiveShadows = true;
+
+    // Una rejilla compartida une ambas franjas sin solapar piedras en el
+    // cruce. Las piezas de los extremos se recortan a los límites del camino.
+    const step = 1.1;
+    const zOrigin = -5.1;
+    const tiles = new Map<string, PathTile>();
+    const paths = [
+      { minX: -1.1, maxX: 1.1, minZ: -28, maxZ: 12 },
+      { minX: -16, maxX: 14, minZ: -5.1, maxZ: -2.9 },
+    ];
+    for (const path of paths) {
+      const minCol = Math.floor(path.minX / step);
+      const maxCol = Math.ceil(path.maxX / step) - 1;
+      const minRow = Math.floor((path.minZ - zOrigin) / step);
+      const maxRow = Math.ceil((path.maxZ - zOrigin) / step) - 1;
+      for (let row = minRow; row <= maxRow; row++) {
+        for (let col = minCol; col <= maxCol; col++) {
+          const minX = Math.max(path.minX, col * step);
+          const maxX = Math.min(path.maxX, (col + 1) * step);
+          const minZ = Math.max(path.minZ, zOrigin + row * step);
+          const maxZ = Math.min(path.maxZ, zOrigin + (row + 1) * step);
+          const width = maxX - minX - 0.12;
+          const depth = maxZ - minZ - 0.12;
+          if (width <= 0 || depth <= 0) continue;
+          tiles.set(`${col}_${row}`, {
+            x: (minX + maxX) / 2,
+            z: (minZ + maxZ) / 2,
+            width,
+            depth,
+            variant: (((col * 7 + row * 11) % 3) + 3) % 3,
+          });
+        }
+      }
+    }
+
+    const stone = this.mat(0.69, 0.59, 0.43);
+    const prims = [...tiles.values()].map((tile, i) => {
+      const mesh = BABYLON.MeshBuilder.CreateBox(
+        `pathTileFallback_${i}`,
+        { width: tile.width, height: 0.035, depth: tile.depth },
+        this.scene,
+      );
+      mesh.position.set(tile.x, 0.0575, tile.z);
+      mesh.material = stone;
+      mesh.receiveShadows = true;
+      mesh.isPickable = false;
+      return mesh;
+    });
+    void this._loadPathTiles([...tiles.values()], prims);
+  }
+
+  private async _loadPathTiles(tiles: PathTile[], prims: any[]): Promise<void> {
+    const imports: any[] = [];
+    const roots: any[] = [];
+    try {
+      // Solo tres importaciones; cada baldosa comparte la geometría y el
+      // material de su variante mediante instancias de Babylon.
+      for (let i = 1; i <= 3; i++) {
+        const res = await BABYLON.SceneLoader.ImportMeshAsync(
+          '',
+          '/models/',
+          `baldosa_camino_0${i}.glb`,
+          this.scene,
+        );
+        imports.push(res);
+        const template = res.meshes[0];
+        if (!template || !res.meshes.some((mesh: any) => mesh.getTotalVertices() > 0)) {
+          throw new Error('Baldosa sin malla');
+        }
+        const { min, max } = template.getHierarchyBoundingVectors(true);
+        const spans = [max.x - min.x, max.y - min.y, max.z - min.z];
+        if (spans.some((span) => !Number.isFinite(span) || span <= 0)) {
+          throw new Error('Baldosa sin dimensiones válidas');
+        }
+        // Las instancias se dibujan con la configuración de su malla fuente.
+        for (const mesh of res.meshes) {
+          mesh.receiveShadows = true;
+          mesh.isPickable = false;
+        }
+        template.setEnabled(false);
+        for (let j = 0; j < tiles.length; j++) {
+          const tile = tiles[j];
+          if (tile.variant !== i - 1) continue;
+          const sx = tile.width / spans[0];
+          const sy = 0.035 / spans[1];
+          const sz = tile.depth / spans[2];
+          const root = new BABYLON.TransformNode(`pathTile_${j}`, this.scene);
+          roots.push(root);
+          root.scaling.set(sx, sy, sz);
+          root.position.set(
+            tile.x - ((min.x + max.x) / 2) * sx,
+            0.04 - min.y * sy,
+            tile.z - ((min.z + max.z) / 2) * sz,
+          );
+          template.instantiateHierarchy(
+            root,
+            { doNotInstantiate: false },
+            (_source: any, clone: any) => {
+              clone.setEnabled(true);
+              clone.receiveShadows = true;
+              clone.isPickable = false;
+            },
+          );
+          root.setEnabled(false);
+        }
+      }
+      for (const root of roots) root.setEnabled(true);
+      for (const prim of prims) prim.dispose();
+    } catch {
+      for (const root of roots) root.dispose();
+      for (const res of imports) {
+        for (const mesh of res.meshes) mesh.dispose(false, true);
+      }
+      // Fallback: baldosas de cajas sobre los caminos de tierra actuales.
+    }
   }
 
   // Forja de Gon: la colisión permanece aunque el GLB aún no haya cargado.
