@@ -40,6 +40,15 @@ Contenido binario del juego: modelos `.glb`, texturas y audio.
   `assets/casa_lila_referencia.png` y
   `assets/casa_lila_referencia_frontal.png` (primer concepto descartado por
   no aportar profundidad suficiente).
+- `models/casa_gon.glb` — casa y forja de Gon, generada con Hunyuan3D-2mini
+  y textura de 2048×2048 a partir de `assets/casa_gon_referencia.png`
+  (Z-Image-Turbo local). Piedra gris, entramado de madera, tejado de
+  terracota, chimenea y detalles de herrería. Una isla de 40.000 triángulos;
+  19.990 vértices tras soldar duplicados. Puerta orientada hacia `+z` y
+  base en `z=0` en Blender. Se sirve como `public/models/casa_gon.glb`, con
+  escala por caja envolvente, colisión independiente y casa gris de
+  respaldo. Fuente editable: `assets/casa_gon.blend`; workflow y script
+  de acabado en [`assets/casa_gon/`](casa_gon/README.md).
 - `models/lila.glb` — modelo 3D de Lila (la florista) generado con
   Hunyuan3D-2 (servidor local, imagen→3D con textura) a partir de
   `assets/lila_referencia.png` (imagen generada con ComfyUI en Windows,
