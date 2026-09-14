@@ -180,9 +180,92 @@ export class WorldView {
   buildBuildings(): void {
     this.buildMartaShop();
     this.buildHouse(-14, -10, this.mat(0.55, 0.56, 0.6)); // Forja de Gon (gris)
-    this.buildHouse(4, -18, this.mat(0.5, 0.72, 0.5)); // Casa de Lila (verde)
+    this.buildLilaHouse();
     this.buildStorage(); // Almacén del granjero, al este de la parcela
     this.buildSalesStand(); // Puesto de ventas, junto al almacén y frente a la parcela
+  }
+
+  // Casa de Lila: GLB texturizado con la misma colisión y el fallback verde
+  // que tenía antes. La caja no depende de la carga asíncrona del modelo.
+  buildLilaHouse(): void {
+    const x = 4;
+    const z = -18;
+    const hit = BABYLON.MeshBuilder.CreateBox(
+      'lilaHouseHit',
+      { width: 4.4, height: 4.8, depth: 4.4 },
+      this.scene,
+    );
+    hit.position.set(x, 2.4, z);
+    hit.isVisible = false;
+    hit.physicsImpostor = new BABYLON.PhysicsImpostor(
+      hit,
+      BABYLON.PhysicsImpostor.BoxImpostor,
+      { mass: 0 },
+      this.scene,
+    );
+
+    const root = new BABYLON.TransformNode('lilaHouseRoot', this.scene);
+    root.position.set(x, 0, z);
+    const prims: any[] = [];
+
+    const base = BABYLON.MeshBuilder.CreateBox(
+      'lilaHouseBase',
+      { width: 4.4, height: 3, depth: 4.4 },
+      this.scene,
+    );
+    base.parent = root;
+    base.position.y = 1.5;
+    base.material = this.mat(0.5, 0.72, 0.5);
+    base.receiveShadows = true;
+    this.addShadow(base);
+    prims.push(base);
+
+    const roof = BABYLON.MeshBuilder.CreateCylinder(
+      'lilaHouseRoof',
+      { diameterTop: 0, diameterBottom: 6.2, height: 2.2, tessellation: 4 },
+      this.scene,
+    );
+    roof.parent = root;
+    roof.position.y = 4.1;
+    roof.rotation.y = Math.PI / 4;
+    roof.material = this.mat(0.55, 0.22, 0.18);
+    this.addShadow(roof);
+    prims.push(roof);
+
+    const door = BABYLON.MeshBuilder.CreateBox(
+      'lilaHouseDoor',
+      { width: 1, height: 1.8, depth: 0.15 },
+      this.scene,
+    );
+    door.parent = root;
+    door.position.set(0, 0.9, 2.25);
+    door.material = this.mat(0.35, 0.22, 0.1);
+    prims.push(door);
+
+    this._loadLilaHouse(root, prims);
+  }
+
+  private async _loadLilaHouse(root: any, prims: any[]): Promise<void> {
+    try {
+      const res = await BABYLON.SceneLoader.ImportMeshAsync(
+        '',
+        '/models/',
+        'casa_lila.glb',
+        this.scene,
+      );
+      const model = res.meshes[0];
+      const { min, max } = model.getHierarchyBoundingVectors(true);
+      const escala = 4.8 / (max.y - min.y);
+      model.parent = root;
+      model.scaling = new BABYLON.Vector3(escala, escala, escala);
+      model.position.y = -min.y * escala;
+      for (const mesh of res.meshes) {
+        if (mesh.getTotalVertices() > 0) this.addShadow(mesh);
+      }
+      for (const prim of prims) prim.dispose();
+    } catch {
+      // Fallback: la casa verde de primitivas permanece visible.
+    }
   }
 
   // Tienda de Marta: modelo GLB texturizado con una casa y escaparate de
