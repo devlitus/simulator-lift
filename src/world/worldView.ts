@@ -134,26 +134,40 @@ export class WorldView {
     p2.receiveShadows = true;
   }
 
-  // Casa simple: base de caja + tejado piramidal (cilindro de 4 caras) + puerta
-  buildHouse(x: number, z: number, color: any): any {
-    const base = BABYLON.MeshBuilder.CreateBox(
-      'house',
-      { width: 4.4, height: 3, depth: 4.4 },
+  // Forja de Gon: la colisión permanece aunque el GLB aún no haya cargado.
+  // La casa gris original sirve de respaldo si falla la importación.
+  buildGonHouse(): void {
+    const x = -14;
+    const z = -10;
+    const hit = BABYLON.MeshBuilder.CreateBox(
+      'gonHouseHit',
+      { width: 4.4, height: 4.8, depth: 4.4 },
       this.scene,
     );
-    base.position.set(x, 1.5, z);
-    base.material = color;
-    base.receiveShadows = true;
-    base.physicsImpostor = new BABYLON.PhysicsImpostor(
-      base,
+    hit.position.set(x, 2.4, z);
+    hit.isVisible = false;
+    hit.physicsImpostor = new BABYLON.PhysicsImpostor(
+      hit,
       BABYLON.PhysicsImpostor.BoxImpostor,
       { mass: 0 },
       this.scene,
     );
+
+    const root = new BABYLON.TransformNode('gonHouseRoot', this.scene);
+    root.position.set(x, 0, z);
+    const base = BABYLON.MeshBuilder.CreateBox(
+      'gonHouseBase',
+      { width: 4.4, height: 3, depth: 4.4 },
+      this.scene,
+    );
+    base.parent = root;
+    base.position.y = 1.5;
+    base.material = this.mat(0.55, 0.56, 0.6);
+    base.receiveShadows = true;
     this.addShadow(base);
 
     const roof = BABYLON.MeshBuilder.CreateCylinder(
-      'roof',
+      'gonHouseRoof',
       {
         diameterTop: 0,
         diameterBottom: 6.2,
@@ -162,24 +176,56 @@ export class WorldView {
       },
       this.scene,
     );
-    roof.position.set(x, 4.1, z);
+    roof.parent = root;
+    roof.position.y = 4.1;
     roof.rotation.y = Math.PI / 4;
     roof.material = this.mat(0.55, 0.22, 0.18);
     this.addShadow(roof);
 
     const door = BABYLON.MeshBuilder.CreateBox(
-      'door',
+      'gonHouseDoor',
       { width: 1, height: 1.8, depth: 0.15 },
       this.scene,
     );
-    door.position.set(x, 0.9, z + 2.25);
+    door.parent = root;
+    door.position.set(0, 0.9, 2.25);
     door.material = this.mat(0.35, 0.22, 0.1);
-    return base;
+    this._loadGonHouse(root, [base, roof, door]);
+  }
+
+  private async _loadGonHouse(root: any, prims: any[]): Promise<void> {
+    try {
+      const res = await BABYLON.SceneLoader.ImportMeshAsync(
+        '',
+        '/models/',
+        'casa_gon.glb',
+        this.scene,
+      );
+      const model = res.meshes[0];
+      const { min, max } = model.getHierarchyBoundingVectors(true);
+      const escala = 4.8 / (max.y - min.y);
+      model.parent = root;
+      model.scaling = new BABYLON.Vector3(escala, escala, escala);
+      model.position.set(
+        -((min.x + max.x) / 2) * escala,
+        -min.y * escala,
+        -((min.z + max.z) / 2) * escala,
+      );
+      for (const mesh of res.meshes) {
+        if (mesh.getTotalVertices() > 0) {
+          mesh.receiveShadows = true;
+          this.addShadow(mesh);
+        }
+      }
+      for (const prim of prims) prim.dispose();
+    } catch {
+      // Fallback: la forja gris de primitivas permanece visible.
+    }
   }
 
   buildBuildings(): void {
     this.buildMartaShop();
-    this.buildHouse(-14, -10, this.mat(0.55, 0.56, 0.6)); // Forja de Gon (gris)
+    this.buildGonHouse();
     this.buildLilaHouse();
     this.buildStorage(); // Almacén del granjero, al este de la parcela
     this.buildSalesStand(); // Puesto de ventas, junto al almacén y frente a la parcela
