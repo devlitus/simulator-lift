@@ -28,7 +28,18 @@ Contenido binario del juego: modelos `.glb`, texturas y audio.
   los pies en z=0 (~1.96 de alto; la vista lo escala a ~1.5 m por caja
   envolvente). SIN rig ni animaciones (Marta no patrulla). Es el que sirve
    el juego en `public/models/marta.glb`. Fuentes editables:
-   `assets/marta.blend` (malla limpia) y `assets/marta_referencia.png`.
+  `assets/marta.blend` (malla limpia) y `assets/marta_referencia.png`.
+- `models/casa_lila.glb` — casa 3D texturizada de Lila, generada con
+  Hunyuan3D-2 a partir de `assets/casa_lila_referencia.png` (referencia
+  isométrica creada con Z-Image-Turbo). La malla se limpió soldando 6.179
+  vértices duplicados y es un único componente de 40.000 caras; tiene
+  profundidad real, la puerta queda hacia `+z` y la base está a `z=0` en
+  Blender. El juego la sirve como `public/models/casa_lila.glb`, la escala
+  por su caja envolvente y mantiene una casa de primitivas como respaldo.
+  Fuentes editables: `assets/casa_lila.blend`,
+  `assets/casa_lila_referencia.png` y
+  `assets/casa_lila_referencia_frontal.png` (primer concepto descartado por
+  no aportar profundidad suficiente).
 - `models/lila.glb` — modelo 3D de Lila (la florista) generado con
   Hunyuan3D-2 (servidor local, imagen→3D con textura) a partir de
   `assets/lila_referencia.png` (imagen generada con ComfyUI en Windows,
