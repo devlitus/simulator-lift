@@ -740,31 +740,70 @@ export class WorldView {
     }
   }
 
-  buildTree(x: number, z: number): void {
+  buildTree(x: number, z: number, variant: string): void {
+    const root = new BABYLON.TransformNode('treeRoot', this.scene);
+    root.position.set(x, 0, z);
+    const prims: any[] = [];
+
+    // La colisión no depende del GLB: se mantiene al cargar y si la carga falla.
+    const hit = BABYLON.MeshBuilder.CreateCylinder(
+      'treeHit',
+      { height: 1.6, diameter: 0.5 },
+      this.scene,
+    );
+    hit.position.set(x, 0.8, z);
+    hit.isVisible = false;
+    hit.physicsImpostor = new BABYLON.PhysicsImpostor(
+      hit,
+      BABYLON.PhysicsImpostor.CylinderImpostor,
+      { mass: 0 },
+      this.scene,
+    );
+
     const trunk = BABYLON.MeshBuilder.CreateCylinder(
       'trunk',
       { height: 1.6, diameter: 0.4 },
       this.scene,
     );
-    trunk.position.set(x, 0.8, z);
+    trunk.parent = root;
+    trunk.position.set(0, 0.8, 0);
     trunk.material = this.mat(0.4, 0.26, 0.13);
-    trunk.physicsImpostor = new BABYLON.PhysicsImpostor(
-      trunk,
-      BABYLON.PhysicsImpostor.BoxImpostor,
-      { mass: 0 },
-      this.scene,
-    );
     this.addShadow(trunk);
+    prims.push(trunk);
 
     const leafMat = this.mat(0.16, 0.45, 0.18);
     const l1 = BABYLON.MeshBuilder.CreateSphere('leaf1', { diameter: 2.2 }, this.scene);
-    l1.position.set(x, 2.4, z);
+    l1.parent = root;
+    l1.position.set(0, 2.4, 0);
     l1.material = leafMat;
     this.addShadow(l1);
+    prims.push(l1);
     const l2 = BABYLON.MeshBuilder.CreateSphere('leaf2', { diameter: 1.4 }, this.scene);
-    l2.position.set(x, 3.3, z);
+    l2.parent = root;
+    l2.position.set(0, 3.3, 0);
     l2.material = leafMat;
     this.addShadow(l2);
+    prims.push(l2);
+
+    this._loadTree(root, variant, prims);
+  }
+
+  private async _loadTree(root: any, variant: string, prims: any[]): Promise<void> {
+    try {
+      const res = await BABYLON.SceneLoader.ImportMeshAsync('', '/models/', variant, this.scene);
+      const model = res.meshes[0];
+      const { min, max } = model.getHierarchyBoundingVectors(true);
+      const escala = 4 / (max.y - min.y);
+      model.parent = root;
+      model.scaling = new BABYLON.Vector3(escala, escala, escala);
+      model.position.y = -min.y * escala;
+      for (const mesh of res.meshes) {
+        if (mesh.getTotalVertices() > 0) this.addShadow(mesh);
+      }
+      for (const prim of prims) prim.dispose();
+    } catch {
+      // fallback: se mantienen las primitivas y la colisión fija.
+    }
   }
 
   buildTrees(): void {
@@ -780,7 +819,10 @@ export class WorldView {
       [14, 14],
       [-16, -16],
     ];
-    for (const [x, z] of spots) this.buildTree(x, z);
+    const variants = ['arbol_01.glb', 'arbol_02.glb', 'arbol_03.glb'];
+    for (const [index, [x, z]] of spots.entries()) {
+      this.buildTree(x, z, variants[index % variants.length]);
+    }
   }
 
   // Pozo de la plaza: colisión estable durante la carga y si falla el GLB.

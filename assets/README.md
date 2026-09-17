@@ -126,6 +126,18 @@ Contenido binario del juego: modelos `.glb`, texturas y audio.
   SIN rig ni animaciones (edificio estático). Fuentes editables:
   `assets/almacen.blend` (malla limpia) y `assets/almacen_referencia.png`.
 
+- `arbol_01.glb`, `arbol_02.glb` y `arbol_03.glb` — tres variantes de árbol
+  estático low-poly, con troncos marrones y copas verdes de siluetas y paletas
+  distintas. Las referencias se generaron en ComfyUI con Z-Image-Turbo a
+  1024×1024, 8 pasos, CFG 1.0 y semillas `1709202601`–`1709202603`; cada una
+  se convirtió con Hunyuan3D-2mini con texturas. Las mallas se soldaron antes
+  de limpiar islas, se giraron 180° sobre el eje vertical, se apoyaron en la
+  base y se optimizaron a 11.624 / 11.996 / 11.996 triángulos. Sus fuentes
+  editables y GLB fuente son `assets/arbol_0N.blend` y `assets/arbol_0N.glb`;
+  referencias y workflows reproducibles están en [`assets/arboles/`](arboles/).
+  Las copias servidas están en `public/models/` y `WorldView` conserva
+  primitivas como respaldo y una colisión independiente por árbol.
+
 - `pozo.glb` — pozo de piedra, madera y terracota con brocal hueco, torno,
   cuerda y cubo. Referencia `assets/pozo_referencia.png` generada con ComfyUI
   (`image_qwen_Image_2512`, Qwen Image 2512 FP8, 1024×1024, seed 13092026).
