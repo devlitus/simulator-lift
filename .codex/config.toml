@@ -1,21 +1,18 @@
 # MCPs locales compartidos por los clientes Codex que abran este proyecto.
-# ComfyUI vive en Windows; se inicia mediante CMD para cruzar WSL correctamente.
+# ComfyUI y sus herramientas viven en WSL.
 
 [mcp_servers.comfy]
-command = "cmd.exe"
-args = [
-  "/d",
-  "/s",
-  "/c",
-  "C:\\ComfyUI_windows_portable_nvidia\\ComfyUI_windows_portable\\python_embeded\\Scripts\\comfy-mcp.exe",
-]
+command = "/home/carle/ai/ComfyUI/.venv/bin/comfy-mcp"
+args = []
 startup_timeout_sec = 30
 tool_timeout_sec = 300
 enabled = true
 default_tools_approval_mode = "prompt"
 
 [mcp_servers.comfy.env]
-COMFY_BIN = "C:\\ComfyUI_windows_portable_nvidia\\ComfyUI_windows_portable\\python_embeded\\Scripts\\comfy.exe"
+COMFY_BIN = "/home/carle/ai/ComfyUI/.venv/bin/comfy"
+COMFY_PROJECT = "/home/carle/ai/ComfyUI"
+COMFY_LOCAL_URL = "http://127.0.0.1:8188"
 
 [mcp_servers.blender]
 command = "/home/carle/.local/bin/uvx"
