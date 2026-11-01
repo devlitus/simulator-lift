@@ -33,6 +33,7 @@ import { NPC_DEFS } from '../data/npcs';
 import { QUEST_DEFS } from '../data/quests';
 
 import { TREE_SPOTS, WorldView } from './world/worldView';
+import { canSleep } from './world/sleep';
 import { SceneryView } from './world/sceneryView';
 import { PlayerView } from './player/playerView';
 import { FarmLogic } from './crops/farmLogic';
@@ -159,6 +160,16 @@ function drawWater(): void {
   player.playRefill(world.well, segundos);
 }
 
+// ---------- Dormir en casa ----------
+// Fundido a negro; con la pantalla a oscuras empieza el día siguiente y el
+// granjero despierta delante de su puerta.
+function sleep(): void {
+  ui.fadeSleep(() => {
+    world.sleep(state.day);
+    player.teleport(world.homeWake.x, world.homeWake.z);
+  });
+}
+
 // ---------- Ciclo de día nuevo ----------
 bus.on(EVENTS.DAY_NEW, ({ day }) => {
   state.day = day;
@@ -197,6 +208,19 @@ function findInteraction(): Interaction | null {
           total > 0 ? `💰 Vendiste la cosecha por ${total} 🪙` : '🧺 No tienes nada para vender',
         );
       },
+    });
+  }
+
+  const door = world.homeDoor;
+  const dDoor = Math.hypot(p.x - door.x, p.z - door.z);
+  if (dDoor < CONFIG.interactionRadius) {
+    const puede = canSleep(world.getHour(), BALANCE.sleepFromHour);
+    candidates.push({
+      dist: dDoor,
+      label: puede
+        ? 'E: Dormir hasta mañana 🛏️'
+        : `🏠 Tu casa — podrás dormir a partir de las ${BALANCE.sleepFromHour}:00`,
+      action: puede ? sleep : null,
     });
   }
 

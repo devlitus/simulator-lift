@@ -8,6 +8,7 @@ import { ShadowGenerator } from '@babylonjs/core/Lights/Shadows/shadowGenerator'
 import { DirectionalLight } from '@babylonjs/core/Lights/directionalLight';
 import { HemisphericLight } from '@babylonjs/core/Lights/hemisphericLight';
 import { SceneLoader } from '@babylonjs/core/Loading/sceneLoader';
+import { PBRMaterial } from '@babylonjs/core/Materials/PBR/pbrMaterial';
 import { StandardMaterial } from '@babylonjs/core/Materials/standardMaterial';
 import { Texture } from '@babylonjs/core/Materials/Textures/texture';
 import { Color3, Color4 } from '@babylonjs/core/Maths/math.color';
@@ -55,6 +56,10 @@ export const TREE_SPOTS: number[][] = [
   [-16, -16],
 ];
 
+// Casa del granjero (assets/casa_granjero/): cabaña de 5×4 m con la puerta
+// al sur (+z), mirando a la cámara, y porche delante.
+const FARMER_HOUSE = { x: -6.5, z: 14, width: 5.2, depth: 4.2, height: 4.8 };
+
 // Recorta lo que queda por encima de 1.3 m (Babylon descarta y - 1.3 > 0)
 const STORAGE_CUT_PLANE = new Plane(0, 1, 0, -1.3);
 
@@ -72,6 +77,9 @@ export class WorldView {
   wellCrank: { x: number; z: number }; // donde se pone el granjero para girar la manivela
   wellView: WellView | null = null; // animación del cubo (si carga el GLB)
   storageCut = false; // el granjero está dentro del almacén
+  homeDoor: { x: number; z: number }; // puerta de la casa del granjero (dormir)
+  homeWake: { x: number; z: number }; // donde aparece el granjero al despertar
+  private homeWindows: PBRMaterial | null = null; // cristales: se encienden de noche
 
   constructor(
     scene: Scene,
@@ -113,6 +121,9 @@ export class WorldView {
     // La manivela sale por el lado -x del pozo (a la derecha en pantalla):
     // pozo.glb la tiene en +x de Blender y la conversión de ejes la refleja.
     this.wellCrank = { x: this.well.x - 1.35, z: this.well.z };
+    const h = FARMER_HOUSE;
+    this.homeDoor = { x: h.x, z: h.z + h.depth / 2 };
+    this.homeWake = { x: h.x, z: h.z + h.depth / 2 + 1.9 }; // al pie del escalón
 
     this.buildGround();
     this.buildBounds();
@@ -397,6 +408,7 @@ export class WorldView {
     this.buildMartaShop();
     this.buildGonHouse();
     this.buildLilaHouse();
+    this.buildFarmerHouse(); // Casa del granjero, al sur del recinto
     this.buildStorage(); // Almacén del granjero, al este de la parcela
     this.buildSalesStand(); // Puesto de ventas, junto al almacén y frente a la parcela
   }
@@ -868,6 +880,110 @@ export class WorldView {
     }
   }
 
+  // Casa del granjero: colisión fija (cuerpo + porche con escalón) que no
+  // depende del GLB, y casa de primitivas como respaldo si falla la carga.
+  buildFarmerHouse(): void {
+    const { x, z, width, depth, height } = FARMER_HOUSE;
+    const colliders = [
+      // Cuerpo, con la chimenea al oeste y la leña al este
+      { w: width + 1.4, h: height, d: depth, cx: x, cz: z },
+      { w: 2.5, h: 0.5, d: 1.4, cx: x, cz: z + depth / 2 + 0.7 }, // porche y escalón
+      { w: 0.7, h: 0.8, d: 0.7, cx: x - 2, cz: z + depth / 2 + 0.75 }, // barril
+    ];
+    for (const c of colliders) {
+      const hit = MeshBuilder.CreateBox(
+        'farmerHouseHit',
+        { width: c.w, height: c.h, depth: c.d },
+        this.scene,
+      );
+      hit.position.set(c.cx, c.h / 2, c.cz);
+      hit.isVisible = false;
+      hit.physicsImpostor = new PhysicsImpostor(
+        hit,
+        PhysicsImpostor.BoxImpostor,
+        { mass: 0 },
+        this.scene,
+      );
+    }
+
+    const root = new TransformNode('farmerHouseRoot', this.scene);
+    root.position.set(x, 0, z);
+    const base = MeshBuilder.CreateBox(
+      'farmerHouseBase',
+      { width, height: 2.6, depth },
+      this.scene,
+    );
+    base.parent = root;
+    base.position.y = 1.3;
+    base.material = this.mat(0.62, 0.42, 0.24);
+    base.receiveShadows = true;
+    this.addShadow(base);
+
+    const roof = MeshBuilder.CreateCylinder(
+      'farmerHouseRoof',
+      { diameterTop: 0, diameterBottom: 6.6, height: 2, tessellation: 4 },
+      this.scene,
+    );
+    roof.parent = root;
+    roof.position.y = 3.6;
+    roof.rotation.y = Math.PI / 4;
+    roof.material = this.mat(0.68, 0.29, 0.2);
+    this.addShadow(roof);
+
+    const door = MeshBuilder.CreateBox(
+      'farmerHouseDoor',
+      { width: 1, height: 1.9, depth: 0.15 },
+      this.scene,
+    );
+    door.parent = root;
+    door.position.set(0, 0.95, depth / 2);
+    door.material = this.mat(0.26, 0.47, 0.44);
+    void this._loadFarmerHouse(root, [base, roof, door]);
+  }
+
+  private async _loadFarmerHouse(root: TransformNode, prims: Mesh[]): Promise<void> {
+    let imported: ISceneLoaderAsyncResult | null = null;
+    try {
+      imported = await SceneLoader.ImportMeshAsync('', '/models/', 'casa_granjero.glb', this.scene);
+      const model = imported.meshes[0];
+      const { min, max } = model.getHierarchyBoundingVectors(true);
+      const alto = max.y - min.y;
+      if (!Number.isFinite(alto) || alto <= 0) throw new Error('Casa sin dimensiones');
+      const escala = FARMER_HOUSE.height / alto;
+      model.parent = root;
+      // El pivote del GLB es el centro de la planta (el porche y la chimenea
+      // descentran la caja), así que solo se apoya en el suelo. Se conserva
+      // el signo de la escala del root glTF (conversión de ejes).
+      model.scaling.scaleInPlace(escala);
+      model.position.y = -min.y * escala;
+      for (const mesh of imported.meshes) {
+        if (mesh.getTotalVertices() > 0) {
+          mesh.receiveShadows = true;
+          this.addShadow(mesh);
+        }
+        if (mesh.material instanceof PBRMaterial && mesh.material.name === 'M_Cristal') {
+          this.homeWindows = mesh.material;
+        }
+      }
+      for (const prim of prims) {
+        this.shadow?.removeShadowCaster(prim);
+        prim.dispose(false, true);
+      }
+    } catch {
+      // Fallback: la casa de primitivas y su colisión siguen disponibles.
+      if (imported) {
+        for (const mesh of imported.meshes) mesh.dispose(false, true);
+      }
+    }
+  }
+
+  // Dormir: salta al amanecer siguiente. Como el día va de 06:00 a 06:00,
+  // tanto a las 22:00 como a las 02:00 se despierta en el día `day + 1`.
+  sleep(day: number): void {
+    this.time = 0;
+    this.bus.emit(EVENTS.DAY_NEW, { day: day + 1 });
+  }
+
   buildTrees(): void {
     const variants = ['arbol_01.glb', 'arbol_02.glb', 'arbol_03.glb'];
     for (const [index, [x, z]] of TREE_SPOTS.entries()) {
@@ -1173,5 +1289,11 @@ export class WorldView {
     );
     const sky = this.scene.clearColor;
     this.scene.fogColor.copyFromFloats(sky.r, sky.g, sky.b);
+
+    // Luz cálida en las ventanas de casa al anochecer
+    if (this.homeWindows) {
+      const noche = 1 - Math.min(1, f * 3);
+      this.homeWindows.emissiveColor.copyFromFloats(1 * noche, 0.72 * noche, 0.35 * noche);
+    }
   }
 }

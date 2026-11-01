@@ -265,6 +265,14 @@ export class PlayerView {
     return this.root.position;
   }
 
+  // Coloca al granjero quieto en (x, z) mirando a la cámara (al despertar).
+  // La física copia la posición de la malla al cuerpo en el siguiente paso.
+  teleport(x: number, z: number): void {
+    this.root.position.set(x, 1.2, z);
+    this._imp.setLinearVelocity(Vector3.Zero());
+    this.visual.rotation.y = 0;
+  }
+
   // La cámara es fija (mira hacia -z desde +z), así que el input se mapea
   // directo al mundo: W/arriba = -z (alejarse, arriba en pantalla),
   // D/derecha = -x (derecha en pantalla).
