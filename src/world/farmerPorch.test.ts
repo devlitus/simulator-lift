@@ -17,40 +17,45 @@ function chocaBarrera(x: number, z: number): boolean {
 }
 
 describe('porche de la casa del granjero', () => {
+  it('la puerta mira al oeste, hacia la entrada de la granja', () => {
+    expect(DOOR_SPOT.x).toBeLessThan(H.x);
+    expect(DOOR_SPOT.z).toBe(H.z);
+  });
+
   it('solo se entra frente a la puerta, no desde detrás de la casa', () => {
     expect(canEnterDoor(DOOR_SPOT.x, DOOR_SPOT.z)).toBe(true);
-    expect(canEnterDoor(H.x, H.z - H.depth / 2 - 1)).toBe(false);
-    expect(canEnterDoor(H.x, H.z - 12)).toBe(false);
+    expect(canEnterDoor(H.x + H.depth / 2 + 1, H.z)).toBe(false);
+    expect(canEnterDoor(H.x + 12, H.z)).toBe(false);
   });
 
   it('se sube por dos peldaños hasta la tarima', () => {
-    expect(floorHeightAt(H.x, PORCH.stepFrontZ + 0.1)).toBe(0);
-    expect(floorHeightAt(H.x, PORCH.stepFrontZ - 0.1)).toBe(PORCH.stepHeight);
-    expect(floorHeightAt(H.x, PORCH.deckFrontZ - 0.1)).toBe(PORCH.deckHeight);
+    expect(floorHeightAt(PORCH.stepFrontX - 0.1, H.z)).toBe(0);
+    expect(floorHeightAt(PORCH.stepFrontX + 0.1, H.z)).toBe(PORCH.stepHeight);
+    expect(floorHeightAt(PORCH.deckFrontX + 0.1, H.z)).toBe(PORCH.deckHeight);
   });
 
   it('lejos del porche se pisa el césped', () => {
     expect(floorHeightAt(0, 12)).toBe(0);
-    expect(floorHeightAt(H.x + 3, DOOR_SPOT.z)).toBe(0);
+    expect(floorHeightAt(DOOR_SPOT.x, H.z + 3)).toBe(0);
   });
 
   it('hay paso libre de frente hasta la puerta', () => {
-    for (let z = PORCH.stepFrontZ + 1; z > DOOR_SPOT.z; z -= 0.05) {
-      expect(chocaBarrera(H.x, z)).toBe(false);
+    for (let x = PORCH.stepFrontX - 1; x < DOOR_SPOT.x; x += 0.05) {
+      expect(chocaBarrera(x, H.z)).toBe(false);
     }
   });
 
   it('no se sube a la tarima por los lados ni por el frente fuera del peldaño', () => {
-    expect(chocaBarrera(H.x + PORCH.halfWidth + 0.1, DOOR_SPOT.z)).toBe(true);
-    expect(chocaBarrera(H.x - PORCH.halfWidth - 0.1, DOOR_SPOT.z)).toBe(true);
-    expect(chocaBarrera(H.x + 1, PORCH.deckFrontZ)).toBe(true);
-    expect(chocaBarrera(H.x - 1, PORCH.deckFrontZ)).toBe(true);
+    expect(chocaBarrera(DOOR_SPOT.x, H.z + PORCH.halfWidth + 0.1)).toBe(true);
+    expect(chocaBarrera(DOOR_SPOT.x, H.z - PORCH.halfWidth - 0.1)).toBe(true);
+    expect(chocaBarrera(PORCH.deckFrontX, H.z + 1)).toBe(true);
+    expect(chocaBarrera(PORCH.deckFrontX, H.z - 1)).toBe(true);
   });
 
   it('solo se entra justo frente a la puerta, sobre la tarima', () => {
     expect(canEnterDoor(DOOR_SPOT.x, DOOR_SPOT.z)).toBe(true);
-    expect(canEnterDoor(H.x + 0.7, DOOR_SPOT.z)).toBe(false); // a un lado de la puerta
-    expect(canEnterDoor(H.x, PORCH.deckFrontZ - 0.1)).toBe(false); // en el borde de la tarima
-    expect(canEnterDoor(H.x, PORCH.stepFrontZ + 0.5)).toBe(false); // al pie de los peldaños
+    expect(canEnterDoor(DOOR_SPOT.x, H.z + 0.7)).toBe(false); // a un lado de la puerta
+    expect(canEnterDoor(PORCH.deckFrontX + 0.1, H.z)).toBe(false); // en el borde de la tarima
+    expect(canEnterDoor(PORCH.stepFrontX - 0.5, H.z)).toBe(false); // al pie de los peldaños
   });
 });

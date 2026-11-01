@@ -17,7 +17,7 @@ import { MeshBuilder } from '@babylonjs/core/Meshes/meshBuilder';
 import { PhysicsImpostor } from '@babylonjs/core/Physics/v1/physicsImpostor';
 import type { AbstractMesh, Material, Scene } from '@babylonjs/core';
 import { FARMER_HOUSE, PORCH } from './farmerPorch';
-import { FARM_ZONE, SALES_STAND, WELL, type Rect } from './farmLayout';
+import { FARM_ENTRANCE, FARM_ZONE, SALES_STAND, WELL, type Rect } from './farmLayout';
 import { STORAGE } from './warehouse';
 import type { WorldView } from './worldView';
 
@@ -46,6 +46,7 @@ const CLEAR_ZONES: Rect[] = [
   { minX: -0.5, maxX: 8.5, minZ: -22.5, maxZ: -13.5 }, // casa de Lila
   { minX: -4, maxX: 4.5, minZ: -17.5, maxZ: -10.5 }, // jardín y ruta de Lila
   { minX: 7.5, maxX: 16.5, minZ: -12.5, maxZ: -3.5 }, // tienda de Marta
+  { minX: -2, maxX: 1.7, minZ: FARM_ENTRANCE.z1 - 1, maxZ: FARM_ENTRANCE.z2 + 1 }, // ante la entrada
   ...Object.values(PENS).map((p) => around(p.x1, p.x2, p.z1, p.z2, 0.8)),
   around(
     FARM_CONFIG.origin.x,
@@ -56,10 +57,10 @@ const CLEAR_ZONES: Rect[] = [
   ),
   around(STORAGE.x, STORAGE.x, STORAGE.z, STORAGE.z, STORAGE.depth / 2 + 1),
   around(
-    FARMER_HOUSE.x,
-    FARMER_HOUSE.x,
+    PORCH.stepFrontX,
+    FARMER_HOUSE.x + FARMER_HOUSE.depth / 2,
     FARMER_HOUSE.z,
-    PORCH.stepFrontZ,
+    FARMER_HOUSE.z,
     FARMER_HOUSE.width / 2 + 1,
   ),
   around(WELL.x, WELL.x, WELL.z, WELL.z, 2),

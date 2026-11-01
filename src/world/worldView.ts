@@ -21,7 +21,7 @@ import { PhysicsImpostor } from '@babylonjs/core/Physics/v1/physicsImpostor';
 import { Scene } from '@babylonjs/core/scene';
 import type { ISceneLoaderAsyncResult, Node } from '@babylonjs/core';
 import { FARMER_HOUSE, PORCH_BARRIERS } from './farmerPorch';
-import { SALES_POINT, SALES_STAND, WELL } from './farmLayout';
+import { FARM_FENCE, SALES_POINT, SALES_STAND, WELL } from './farmLayout';
 import { STORAGE, STORAGE_WALLS } from './warehouse';
 import { WellView } from './wellView';
 
@@ -111,6 +111,7 @@ export class WorldView {
     this.buildTrees();
     this.buildDecor();
     this.buildPens();
+    this.buildFarmFence();
   }
 
   addShadow(mesh: AbstractMesh): void {
@@ -653,23 +654,23 @@ export class WorldView {
 
   // Puesto de ventas: modelo GLB (assets/puesto_ventas.glb, publicado en
   // /models/) con fallback a primitivas si falla la carga. Va en la esquina
-  // suroeste de la granja, con el mostrador mirando al oeste (-x), hacia la
-  // calle. El GLB mide ~1.96×1.94×1.21 (la vista lo escala a ~1.9 de
+  // suroeste de la granja, con el mostrador mirando al este (+x), hacia el
+  // interior. El GLB mide ~1.96×1.94×1.21 (la vista lo escala a ~1.9 de
   // alto): es ancho y poco profundo, con el mostrador en su cara frontal.
-  // La rotación -π/2 en Y lleva la fachada local +z hacia el oeste; sellBin
+  // La rotación π/2 en Y lleva la fachada local +z hacia el este; sellBin
   // queda delante del mostrador.
   buildSalesStand(): void {
     const { x, z } = SALES_STAND;
 
     // Colisión fija (independiente del modelo): caja invisible que cubre el
     // volumen del puesto (~1.2×1.9×1.9 tras el giro). El mostrador queda en
-    // la cara oeste y el cuerpo se extiende hacia el este.
+    // la cara este y el cuerpo se extiende hacia el oeste.
     const hit = MeshBuilder.CreateBox(
       'salesStandHit',
       { width: 1.4, height: 2.0, depth: 2.0 },
       this.scene,
     );
-    hit.position.set(x - 0.6, 1.0, z);
+    hit.position.set(x + 0.6, 1.0, z);
     hit.isVisible = false;
     hit.physicsImpostor = new PhysicsImpostor(
       hit,
@@ -678,13 +679,13 @@ export class WorldView {
       this.scene,
     );
 
-    // El frente local +z del GLB rota al oeste, hacia la calle.
+    // El frente local +z del GLB rota al este, hacia el interior de la granja.
     const root = new TransformNode('salesStandRoot', this.scene);
     root.position.set(x, 0, z);
-    root.rotation.y = -Math.PI / 2;
+    root.rotation.y = Math.PI / 2;
 
     // Primitivas de respaldo, con el estilo del resto del pueblo. El
-    // mostrador local +z hereda el giro del root y también mira a la calle.
+    // mostrador local +z hereda el giro del root.
     const prims: Mesh[] = [];
     const counter = MeshBuilder.CreateBox(
       'salesStandCounter',
@@ -820,10 +821,10 @@ export class WorldView {
   buildFarmerHouse(): void {
     const { x, z, width, depth, height } = FARMER_HOUSE;
     const colliders = [
-      // Cuerpo, con la chimenea al oeste y la leña al este
-      { w: width + 1.4, h: height, d: depth, cx: x, cz: z },
+      // Cuerpo, con la chimenea y la leña a los lados de la fachada
+      { w: depth, h: height, d: width + 1.4, cx: x, cz: z },
       ...PORCH_BARRIERS.map((b) => ({ ...b, h: 1 })),
-      { w: 0.7, h: 0.8, d: 0.7, cx: x - 2, cz: z + depth / 2 + 0.75 }, // barril
+      { w: 0.7, h: 0.8, d: 0.7, cx: x - depth / 2 - 0.75, cz: z - 2 }, // barril
     ];
     for (const c of colliders) {
       const hit = MeshBuilder.CreateBox(
@@ -841,8 +842,10 @@ export class WorldView {
       );
     }
 
+    // La fachada del GLB mira a +z; -π/2 en Y la deja mirando a -x, hacia la entrada
     const root = new TransformNode('farmerHouseRoot', this.scene);
     root.position.set(x, 0, z);
+    root.rotation.y = -Math.PI / 2;
     const base = MeshBuilder.CreateBox(
       'farmerHouseBase',
       { width, height: 2.6, depth },
@@ -1123,6 +1126,12 @@ export class WorldView {
       // El lado este solo si no lo pone ya el cercado vecino como su oeste
       if (!pens.some((p) => p.x1 === x2)) this.fenceSide(x2, z1, x2, z2, fenceMat);
     }
+  }
+
+  // Valla de la granja, con su único hueco en el lado de la calle (ver farmLayout).
+  buildFarmFence(): void {
+    const fenceMat = this.mat(0.5, 0.36, 0.2);
+    for (const [x1, z1, x2, z2] of FARM_FENCE) this.fenceSide(x1, z1, x2, z2, fenceMat);
   }
 
   // Un lado de valla: postes cada ~1.9 unidades, dos travesaños

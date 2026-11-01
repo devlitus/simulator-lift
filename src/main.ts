@@ -302,7 +302,7 @@ function findInteraction(): Interaction | null {
     candidates.push({
       dist: Math.hypot(p.x - INTERIOR_EXIT.x, p.z - INTERIOR_EXIT.z),
       label: 'Intro ↵: Salir de casa 🚪',
-      action: () => moveThroughDoor(DOOR_SPOT.x, DOOR_SPOT.z, 0),
+      action: () => moveThroughDoor(DOOR_SPOT.x, DOOR_SPOT.z, -Math.PI / 2),
       key: 'enter',
     });
   }

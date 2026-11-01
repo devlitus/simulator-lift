@@ -14,7 +14,8 @@ Medida sobre la captura, corrigiendo la perspectiva de la cámara.
 
 | Zona | x | z |
 | --- | --- | --- |
-| Granja completa | 1,5 a 30 | -2,5 a 20 |
+| Granja completa, dentro de la valla | 1,6 a 31 | -2,5 a 25 |
+| Entrada, en la valla oeste | 1,6 | 12 a 17,6 |
 | Cercado de ovejas | 1,6 a 5,7 | -2,5 a 6,3 |
 | Cercado de vacas | 5,7 a 10,6 | -2,5 a 6,3 |
 | Cercado de gallinas | 10,6 a 16,6 | -2,5 a 6,3 |
@@ -22,10 +23,15 @@ Medida sobre la captura, corrigiendo la perspectiva de la cámara.
 | Almacén, centro | 25,7 | 8,6 |
 | Casa del granjero, centro | 23 | 15 |
 | Pozo | 13 | 13,5 |
-| Puesto de ventas, centro | 4,3 | 17,8 |
+| Puesto de ventas, centro | 5 | 23,2 |
 
 ## Decisiones
 
+- La granja se valla entera con un único hueco, donde termina la calle. Donde hay un
+  cercado, su valla hace de valla de la granja, sin duplicarla.
+- La casa se gira para que su puerta y su porche miren al oeste, hacia la entrada.
+- El mostrador del puesto de ventas mira al este, hacia el interior: al oeste y al sur
+  tiene la valla.
 - Un cercado por especie en lugar del recinto común: `PENS` sustituye a `PEN` y cada
   animal pasea solo por el suyo. Comparten valla y la puerta da al sur, porque al norte
   está el camino y a los lados, otro cercado.
