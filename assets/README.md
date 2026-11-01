@@ -92,6 +92,16 @@ Contenido binario del juego: modelos `.glb`, texturas y audio.
   el juego en `public/models/gon.glb`. Fuentes editables:
   `assets/gon.blend` (malla limpia), `assets/gon_rig.blend` (rig) y
   `assets/gon_referencia.png`; script `~/blender-mcp/gon/rig_walk.py`.
+- `models/tomas.glb` — modelo 3D de Tomás (el ganadero del rancho),
+  modelado procedural propio en Blender (sin IA) al estilo chibi de Marta,
+  Lila y Gon: sombrero vaquero de paja con cinta, bigote, camisa roja, peto
+  vaquero con botones de latón, pañuelo amarillo y botas. Primitivas
+  suavizadas unidas en una malla (`SM_Tomas`), un material plano por color
+  (17), 19.528 triángulos; cara hacia +Y, pies en z=0, ~1,56 de alto (la
+  vista lo escala a ~1,5 m por caja envolvente). SIN rig ni animaciones
+  (Tomás no patrulla). Se sirve como `public/models/tomas.glb`. Fuente
+  editable `assets/tomas.blend`; script, métricas y preview en
+  [`assets/tomas/`](tomas/README.md).
 - `models/gallina.glb` — modelo 3D de la gallina generado con Hunyuan3D-2
   (servidor local, imagen→3D con textura 2048×2048) a partir de
   `assets/gallina_referencia.png` (imagen generada con ComfyUI en Windows,
