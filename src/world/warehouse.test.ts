@@ -23,8 +23,10 @@ import {
   WAREHOUSE_ENTRY,
   WAREHOUSE_FEED_BAYS,
   WAREHOUSE_SHELVES,
+  WAREHOUSE_STOCK,
   WAREHOUSE_WALLS,
   warehouseSpotAt,
+  visibleStock,
 } from './warehouse';
 
 // Media caja del granjero (playerView): colisiona a esta distancia del centro.
@@ -107,6 +109,55 @@ describe('interior del almacén', () => {
     expect(ids('animal').sort()).toEqual(Object.keys(ANIMALS).sort());
   });
 
+  it('abajo hay una estantería de semillas por cultivo', () => {
+    const semillas = WAREHOUSE_SHELVES.filter((s) => s.kind === 'seed');
+    expect(semillas.map((s) => s.id).sort()).toEqual(Object.keys(CROPS).sort());
+    expect(semillas.every((s) => s.level === 0)).toBe(true);
+  });
+
+  it('arriba está el producto final y abajo no hay ninguno', () => {
+    const productos = WAREHOUSE_SHELVES.filter((s) => s.kind !== 'seed');
+    expect(productos).toHaveLength(Object.keys(CROPS).length + Object.keys(ANIMALS).length);
+    expect(productos.every((s) => s.level === 1)).toBe(true);
+  });
+
+  it('las estanterías de un nivel no se pisan entre sí', () => {
+    for (const nivel of [0, 1]) {
+      const cajas = WAREHOUSE_SHELVES.filter((s) => s.level === nivel)
+        .map((s) => s.collider)
+        .sort((a, b) => a.cx - b.cx);
+      cajas.slice(1).forEach((c, i) => {
+        expect(c.cx - c.w / 2).toBeGreaterThan(cajas[i].cx + cajas[i].w / 2);
+      });
+    }
+  });
+
+  it('toda estantería tiene existencias que mostrar', () => {
+    for (const s of WAREHOUSE_SHELVES) {
+      const grupo = WAREHOUSE_STOCK.find((g) => g.kind === s.kind && g.id === s.id);
+      expect(grupo?.slots.length).toBeGreaterThan(0);
+    }
+  });
+
+  it('sin existencias la estantería queda vacía y se llena de una en una', () => {
+    expect(visibleStock(0, 45)).toBe(0);
+    expect(visibleStock(1, 45)).toBe(1);
+    expect(visibleStock(5, 45)).toBe(5);
+    expect(visibleStock(99, 45)).toBe(45); // llena: no hay más huecos
+  });
+
+  it('las piezas caben en su estantería, sobre su nivel', () => {
+    for (const g of WAREHOUSE_STOCK) {
+      const estante = WAREHOUSE_SHELVES.find((s) => s.kind === g.kind && s.id === g.id)!;
+      const c = estante.collider;
+      for (const p of g.slots) {
+        expect(Math.abs(p.x - c.cx)).toBeLessThan(c.w / 2);
+        expect(Math.abs(p.z - c.cz)).toBeLessThan(c.d / 2);
+        expect(p.y).toBeGreaterThan(g.level === 1 ? LOFT_HEIGHT : 0);
+      }
+    }
+  });
+
   it('cada animal tiene su box de pienso', () => {
     expect(WAREHOUSE_FEED_BAYS.map((b) => b.animal).sort()).toEqual(Object.keys(ANIMALS).sort());
   });
@@ -119,16 +170,19 @@ describe('interior del almacén', () => {
       const z = c.cz + c.d / 2 + MEDIA_CAJA + 0.05;
       expect(niveles[s.level].llega(x, z)).toBe(true);
       const y = s.level === 0 ? Y_ABAJO : Y_ARRIBA;
-      expect(warehouseSpotAt(x, z, y)).toMatchObject({ type: 'shelf', id: s.id });
+      expect(warehouseSpotAt(x, z, y)).toMatchObject({ type: 'shelf', kind: s.kind, id: s.id });
     }
   });
 
   it('una estantería de un nivel no responde desde el otro', () => {
     // Las estanterías de los dos niveles están una sobre otra
-    const c = WAREHOUSE_SHELVES.find((s) => s.id === 'zanahoria')!.collider;
+    const c = WAREHOUSE_SHELVES.find((s) => s.kind === 'seed' && s.id === 'tomate')!.collider;
     const z = c.cz + c.d / 2 + 0.4;
-    expect(warehouseSpotAt(c.cx, z, Y_ABAJO)).toMatchObject({ kind: 'crop', id: 'zanahoria' });
-    expect(warehouseSpotAt(c.cx, z, Y_ARRIBA)).toMatchObject({ kind: 'animal', id: 'gallina' });
+    expect(warehouseSpotAt(c.cx - 0.5, z, Y_ABAJO)).toMatchObject({ kind: 'seed', id: 'tomate' });
+    expect(warehouseSpotAt(c.cx - 0.5, z, Y_ARRIBA)).toMatchObject({
+      kind: 'animal',
+      id: 'gallina',
+    });
   });
 
   it('se entra a pie en cada box de pienso y se reconoce su animal', () => {

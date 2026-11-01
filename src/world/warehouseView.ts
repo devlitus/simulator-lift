@@ -7,6 +7,7 @@ import { PBRMaterial } from '@babylonjs/core/Materials/PBR/pbrMaterial';
 import { DynamicTexture } from '@babylonjs/core/Materials/Textures/dynamicTexture';
 import { StandardMaterial } from '@babylonjs/core/Materials/standardMaterial';
 import { Color3 } from '@babylonjs/core/Maths/math.color';
+import { Matrix, Vector3 } from '@babylonjs/core/Maths/math.vector';
 import { MeshBuilder } from '@babylonjs/core/Meshes/meshBuilder';
 import { TransformNode } from '@babylonjs/core/Meshes/transformNode';
 import { PhysicsImpostor } from '@babylonjs/core/Physics/v1/physicsImpostor';
@@ -17,10 +18,13 @@ import {
   LOFT_COLLIDERS,
   LOFT_HEIGHT,
   LOFT_THICKNESS,
+  type ShelfKind,
+  visibleStock,
   WALL_HEIGHT,
   WAREHOUSE,
   WAREHOUSE_FEED_BAYS,
   WAREHOUSE_SHELVES,
+  WAREHOUSE_STOCK,
   WAREHOUSE_WALLS,
 } from './warehouse';
 
@@ -33,7 +37,7 @@ const LOFT_FADE_RATE = 7; // rapidez del fundido (1/s)
 
 /** Rótulos: nombre e icono de lo que guarda cada zona (los pone main.ts desde data/). */
 export interface WarehouseLabels {
-  shelf: (kind: 'crop' | 'animal', id: string) => string;
+  shelf: (kind: ShelfKind, id: string) => string;
   feed: (animal: string) => string;
 }
 
@@ -43,9 +47,16 @@ export class WarehouseView {
   private loftMaterials: PBRMaterial[] = []; // ídem, los del GLB
   private loftAlpha = 1;
   private glass: PBRMaterial | null = null; // las ventanas dejan ver el día o la noche
+  private stock: { mesh: Mesh; kind: ShelfKind; id: string; slots: number; shown: number }[] = [];
+  private stockOf: (kind: ShelfKind, id: string) => number; // existencias, de main.ts
 
-  constructor(scene: Scene, labels: WarehouseLabels) {
+  constructor(
+    scene: Scene,
+    labels: WarehouseLabels,
+    stockOf: (kind: ShelfKind, id: string) => number,
+  ) {
     this.scene = scene;
+    this.stockOf = stockOf;
     const { x, z, width, depth } = WAREHOUSE;
 
     const solid = (
@@ -129,7 +140,7 @@ export class WarehouseView {
       const c = s.collider;
       const base = s.level === 1 ? LOFT_HEIGHT : 0;
       const m = sign(
-        `rotulo_${s.id}`,
+        `rotulo_${s.kind}_${s.id}`,
         labels.shelf(s.kind, s.id),
         1.46,
         c.cx,
@@ -224,11 +235,14 @@ export class WarehouseView {
         this.loftMeshes = this.loftMeshes.filter((m) => m !== p);
         p.dispose(false, true);
       }
+      const enAltillo = (m: AbstractMesh) =>
+        m.name.startsWith('SM_AlmacenAltillo') ||
+        WAREHOUSE_STOCK.some((g) => g.level === 1 && m.name === `Item_${g.item}`);
       for (const m of res.meshes) {
         if (m.getTotalVertices() === 0) continue;
         // Materiales propios: los del GLB son opacos, ignoran `visibility`, y la
         // planta baja los comparte.
-        if (m.name.startsWith('SM_AlmacenAltillo') && m.material instanceof PBRMaterial) {
+        if (enAltillo(m) && m.material instanceof PBRMaterial) {
           const propio = m.material.clone(`${m.material.name}_altillo`);
           m.material = propio;
           this.loftMaterials.push(propio);
@@ -237,14 +251,48 @@ export class WarehouseView {
           this.glass = m.material;
         }
       }
+      this._buildStock(res.meshes);
     } catch {
       // fallback: se queda el almacén de primitivas
+    }
+  }
+
+  // Cada recurso es una pieza del GLB repetida con thin instances, una por hueco de
+  // su estantería; `thinInstanceCount` decide cuántas se dibujan.
+  private _buildStock(meshes: AbstractMesh[]): void {
+    for (const g of WAREHOUSE_STOCK) {
+      const mesh = meshes.find((m) => m.name === `Item_${g.item}`) as Mesh | undefined;
+      if (!mesh) continue;
+      // Las matrices son relativas a la malla, que cuelga de la raíz reflejada del GLB
+      const aLocal = mesh.computeWorldMatrix(true).clone().invert();
+      const matrices = new Float32Array(g.slots.length * 16);
+      g.slots.forEach((p, i) => {
+        const local = Vector3.TransformCoordinates(new Vector3(p.x, p.y, p.z), aLocal);
+        Matrix.Translation(local.x, local.y, local.z).copyToArray(matrices, i * 16);
+      });
+      mesh.thinInstanceSetBuffer('matrix', matrices, 16);
+      mesh.thinInstanceRefreshBoundingInfo(false);
+      mesh.isVisible = false;
+      this.stock.push({ mesh, kind: g.kind, id: g.id, slots: g.slots.length, shown: 0 });
+    }
+  }
+
+  // Las estanterías enseñan lo que hay: sin existencias, la pieza ni se dibuja
+  // (sin instancias, Babylon pintaría la malla original).
+  private _updateStock(): void {
+    for (const s of this.stock) {
+      const n = visibleStock(this.stockOf(s.kind, s.id), s.slots);
+      if (n === s.shown) continue;
+      s.shown = n;
+      s.mesh.isVisible = n > 0;
+      if (n > 0) s.mesh.thinInstanceCount = n;
     }
   }
 
   // El altillo se aparta con el granjero debajo; la ventana sigue la luz de fuera
   // (`daylight`: 0..1).
   update(dt: number, daylight: number, underLoft: boolean): void {
+    this._updateStock();
     const objetivo = underLoft ? LOFT_FADE_ALPHA : 1;
     if (this.loftAlpha !== objetivo) {
       this.loftAlpha += (objetivo - this.loftAlpha) * (1 - Math.exp(-LOFT_FADE_RATE * dt));

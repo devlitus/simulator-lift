@@ -42,24 +42,86 @@ export const WAREHOUSE_WALLS = [
 
 // Estanterías contra el muro del fondo de cada nivel
 const SHELF_DEPTH = 0.8;
-const SHELF_WIDTH = 3.4;
 const SHELF_BY = 5.55;
-const SHELF_BX = [-4.8, 0, 4.8];
+const SEED_SHELF_WIDTH = 3.4; // tres en la planta baja
+const SEED_SHELF_BX = [-4.8, 0, 4.8];
+const PRODUCT_SHELF_WIDTH = 2.4; // seis en el altillo
+const PRODUCT_SHELF_BX = [-6.5, -3.9, -1.3, 1.3, 3.9, 6.5];
 
-/** Una estantería por recurso: cosechas abajo y productos de granja arriba. */
+export type ShelfKind = 'crop' | 'animal' | 'seed';
+
+const estanteria = (kind: ShelfKind, id: string, level: WarehouseLevel, bx: number, w: number) => ({
+  kind,
+  id,
+  level,
+  collider: pieza(`estanteria_${kind}_${id}`, bx, SHELF_BY, w, SHELF_DEPTH),
+});
+
+/** Semillas abajo, una por cultivo; arriba, el producto final: cosechas y productos de granja. */
 export const WAREHOUSE_SHELVES = [
-  { kind: 'crop', id: 'zanahoria', level: 0, slot: 0 },
-  { kind: 'crop', id: 'tomate', level: 0, slot: 1 },
-  { kind: 'crop', id: 'calabaza', level: 0, slot: 2 },
-  { kind: 'animal', id: 'gallina', level: 1, slot: 0 },
-  { kind: 'animal', id: 'oveja', level: 1, slot: 1 },
-  { kind: 'animal', id: 'vaca', level: 1, slot: 2 },
-].map((s) => ({
-  ...s,
-  kind: s.kind as 'crop' | 'animal',
-  level: s.level as WarehouseLevel,
-  collider: pieza(`estanteria_${s.id}`, SHELF_BX[s.slot], SHELF_BY, SHELF_WIDTH, SHELF_DEPTH),
-}));
+  estanteria('seed', 'zanahoria', 0, SEED_SHELF_BX[0], SEED_SHELF_WIDTH),
+  estanteria('seed', 'tomate', 0, SEED_SHELF_BX[1], SEED_SHELF_WIDTH),
+  estanteria('seed', 'calabaza', 0, SEED_SHELF_BX[2], SEED_SHELF_WIDTH),
+  estanteria('crop', 'zanahoria', 1, PRODUCT_SHELF_BX[0], PRODUCT_SHELF_WIDTH),
+  estanteria('crop', 'tomate', 1, PRODUCT_SHELF_BX[1], PRODUCT_SHELF_WIDTH),
+  estanteria('crop', 'calabaza', 1, PRODUCT_SHELF_BX[2], PRODUCT_SHELF_WIDTH),
+  estanteria('animal', 'gallina', 1, PRODUCT_SHELF_BX[3], PRODUCT_SHELF_WIDTH),
+  estanteria('animal', 'oveja', 1, PRODUCT_SHELF_BX[4], PRODUCT_SHELF_WIDTH),
+  estanteria('animal', 'vaca', 1, PRODUCT_SHELF_BX[5], PRODUCT_SHELF_WIDTH),
+];
+
+// ---------- Existencias: lo que se ve en cada estantería ----------
+
+// Medidas de generar.py: alturas de las baldas y del apoyo sobre ellas
+const SHELF_BOARDS = [0.15, 0.7, 1.25];
+const BOARD_TOP = 0.025;
+const ITEM_FROM_CENTER = 0.18; // una sola fila, al borde de la balda: la cámara la ve entera
+const SHELF_MARGIN = 0.4; // ancho que ocupan los postes
+
+// Separación entre piezas de cada recurso, según su tamaño en generar.py
+const ITEM_STEP: Record<string, number> = {
+  zanahoria: 0.17,
+  tomate: 0.2,
+  calabaza: 0.46,
+  huevo: 0.2,
+  lana: 0.3,
+  leche: 0.36,
+  semilla: 0.15,
+};
+
+function stockGroup(kind: ShelfKind, id: string, item: string, step: number) {
+  const shelf = WAREHOUSE_SHELVES.find((s) => s.kind === kind && s.id === id)!;
+  const c = shelf.collider;
+  const base = shelf.level === 1 ? LOFT_HEIGHT : 0;
+  const perBoard = Math.floor((c.w - SHELF_MARGIN) / step);
+  // De abajo arriba y, en cada balda, de izquierda a derecha en pantalla (-x)
+  const slots = SHELF_BOARDS.flatMap((b) =>
+    Array.from({ length: perBoard }, (_, i) => ({
+      x: c.cx + (perBoard * step) / 2 - (i + 0.5) * step,
+      y: base + b + BOARD_TOP,
+      z: c.cz + ITEM_FROM_CENTER,
+    })),
+  );
+  return { kind, id, item, level: shelf.level, slots };
+}
+
+/** Cada recurso con su pieza del GLB (`Item_<item>`) y los huecos que puede llenar. */
+export const WAREHOUSE_STOCK = [
+  stockGroup('crop', 'zanahoria', 'zanahoria', ITEM_STEP.zanahoria),
+  stockGroup('crop', 'tomate', 'tomate', ITEM_STEP.tomate),
+  stockGroup('crop', 'calabaza', 'calabaza', ITEM_STEP.calabaza),
+  stockGroup('animal', 'gallina', 'huevo', ITEM_STEP.huevo),
+  stockGroup('animal', 'oveja', 'lana', ITEM_STEP.lana),
+  stockGroup('animal', 'vaca', 'leche', ITEM_STEP.leche),
+  ...['zanahoria', 'tomate', 'calabaza'].map((crop) =>
+    stockGroup('seed', crop, `semilla_${crop}`, ITEM_STEP.semilla),
+  ),
+];
+
+/** Piezas que se ven con esas existencias: una por unidad, hasta llenar los huecos. */
+export function visibleStock(count: number, slots: number): number {
+  return Math.min(Math.max(0, Math.floor(count)), slots);
+}
 
 // Boxes del pienso contra el muro oeste de la planta baja: tres de 2 m entre by=-6 y 0
 const BAY_DEPTH = 2;
@@ -176,19 +238,24 @@ export function pointOnPath(path: Point3[], t: number): Point3 {
 const SHELF_REACH = 0.75; // del borde de la estantería; su colisión para a 0,35
 
 export type WarehouseSpot =
-  | { type: 'shelf'; kind: 'crop' | 'animal'; id: string; dist: number }
+  | { type: 'shelf'; kind: ShelfKind; id: string; dist: number }
   | { type: 'feed'; animal: string; dist: number };
 
 export function warehouseSpotAt(x: number, z: number, y: number): WarehouseSpot | null {
   const level = warehouseLevel(y);
+  // La más cercana: en el altillo, dos estanterías pueden quedar al alcance a la vez
+  let shelf: WarehouseSpot | null = null;
   for (const s of WAREHOUSE_SHELVES) {
     if (s.level !== level) continue;
     const c = s.collider;
     const dx = Math.max(0, Math.abs(x - c.cx) - c.w / 2);
     const dz = Math.max(0, Math.abs(z - c.cz) - c.d / 2);
     const dist = Math.hypot(dx, dz);
-    if (dist < SHELF_REACH) return { type: 'shelf', kind: s.kind, id: s.id, dist };
+    if (dist < SHELF_REACH && (!shelf || dist < shelf.dist)) {
+      shelf = { type: 'shelf', kind: s.kind, id: s.id, dist };
+    }
   }
+  if (shelf) return shelf;
   if (level === 0) {
     for (const b of WAREHOUSE_FEED_BAYS) {
       if (Math.abs(x - b.cx) < b.w / 2 && Math.abs(z - b.cz) < b.d / 2) {

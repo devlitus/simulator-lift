@@ -8,10 +8,14 @@ por la puerta principal del edificio del pueblo (`assets/almacen.glb`).
 
 | Zona | Nivel | Contenido |
 | --- | --- | --- |
-| Estanterías de cosecha | Planta baja, bajo el altillo | Una por recurso: zanahoria, tomate y calabaza |
+| Estanterías de semillas | Planta baja, bajo el altillo | Una por cultivo: zanahoria, tomate y calabaza |
 | Zona del pienso | Planta baja, muro oeste | Un box por animal, con su color: gallina, oveja y vaca |
 | Altillo | Mitad del fondo, a 2,6 m | Se sube por la escalera de mano |
-| Estanterías de productos | Altillo | Una por recurso: huevos, lana y leche |
+| Estanterías de producto final | Altillo | Una por producto: zanahoria, tomate, calabaza, huevos, lana y leche |
+
+Las estanterías muestran el inventario real: una pieza por unidad y vacías si no
+hay ninguna. Cuando se llenan, dejan de crecer aunque tengas más; la pista indica
+siempre la cantidad exacta.
 
 Todo el suelo libre es transitable en los dos niveles: `src/world/warehouse.test.ts`
 recorre cada planta y falla si queda algún hueco aislado, o si un cultivo o un
@@ -38,14 +42,16 @@ Las texturas se reducen a 512 px al generar el modelo.
 textura usa colores planos en el atributo `Col` (`M_Almacen`) y `M_Cristal` son las
 ventanas (el juego les da la luz de fuera). Dos mallas sin rig: `SM_AlmacenBase` y
 `SM_AlmacenAltillo`, que el juego vuelve translúcida con el granjero debajo; ver
-`metricas.json`. Escala métrica, suelo en z=0 y frente en -Y de Blender (+Z en
-Babylon, con x reflejada).
+`metricas.json`. Las estanterías van vacías: cada recurso es otra malla,
+`Item_<nombre>`, que el juego repite con thin instances. Escala métrica, suelo en
+z=0 y frente en -Y de Blender (+Z en Babylon, con x reflejada).
 
 ## Integración
 
 `WarehouseView` lo coloca en `WAREHOUSE`, lejos del pueblo, sin reescalarlo: las
 colisiones de `src/world/warehouse.ts` usan las mismas coordenadas que este script,
-así que **si mueves una pieza aquí, actualiza también ese archivo**. Los rótulos
+así que **si mueves una pieza aquí, actualiza también ese archivo**, incluidas las
+baldas y la separación de las piezas (`ITEM_STEP`). Los rótulos
 los pinta el juego con los nombres de `data/`. Sin el GLB queda un almacén de
 primitivas con las mismas colisiones.
 

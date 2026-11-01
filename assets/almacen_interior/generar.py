@@ -6,8 +6,10 @@ Almacén de 16 x 12 m en forma de diorama, sin techo y con el muro sur bajo para
 que la cámara isométrica vea dentro. Dos mallas, porque el juego vuelve translúcida
 la segunda cuando el granjero pasa por debajo: SM_AlmacenBase (planta baja, muros y
 escalera) y SM_AlmacenAltillo (losa a 2,6 m sobre la mitad del fondo y lo que hay
-encima). Guarda assets/almacen_interior.blend, exporta el GLB (fuente y publicado)
-y renderiza preview.png. Ver README.md.
+encima). Las estanterías van vacías: cada recurso es una malla suelta Item_<nombre>,
+en el origen, que el juego repite según las existencias. Guarda
+assets/almacen_interior.blend, exporta el GLB (fuente y publicado) y renderiza
+preview.png. Ver README.md.
 """
 
 import json
@@ -41,8 +43,10 @@ PUERTA_Y = -3.0  # en el muro este (+X), el que da a la parcela en el pueblo
 X, Y = ANCHO / 2, FONDO / 2
 
 # Estanterías: mismas posiciones en los dos niveles
-ESTANTE_BX = (-4.8, 0.0, 4.8)
-ESTANTE_ANCHO = 3.4
+SEMILLAS_BX = (-4.8, 0.0, 4.8)  # tres abajo, una por cultivo
+SEMILLAS_ANCHO = 3.4
+PRODUCTOS_BX = (-6.5, -3.9, -1.3, 1.3, 3.9, 6.5)  # seis en el altillo, una por producto
+PRODUCTOS_ANCHO = 2.4
 ESTANTE_FONDO = 0.7
 ESTANTE_Y = 5.55
 ESTANTE_ALTO = 2.2
@@ -73,6 +77,8 @@ HUEVO = (0.95, 0.90, 0.78)
 LANA = (0.93, 0.91, 0.85)
 LANA_TENIDA = (0.70, 0.62, 0.74)
 MIMBRE = (0.70, 0.52, 0.28)
+PAPEL = (0.90, 0.85, 0.72)
+SOBRE_CALABAZA = (0.78, 0.68, 0.16)  # para distinguirlo del sobre de zanahoria
 # Cada animal, un color: marca el suelo de su box y la banda de sus sacos
 COLOR_GALLINA = (0.86, 0.66, 0.18)
 COLOR_OVEJA = (0.38, 0.58, 0.72)
@@ -144,8 +150,8 @@ class Malla:
         self._pintar(caras, color, mat)
 
 
-def ventana(m, x, z0=3.3, ancho=1.05, alto=1.7):
-    """Ventana de cuatro hojas en el muro del fondo, por encima del altillo."""
+def ventana(m, x, z0=4.95, ancho=1.3, alto=0.78):
+    """Ventana de cuatro hojas en el muro del fondo, por encima de las estanterías."""
     y = Y - 0.03
     zc = z0 + alto / 2
     m.caja((x, y, zc), (ancho, 0.04, alto), VIDRIO, mat=CRISTAL)
@@ -291,82 +297,79 @@ def cajas(m):
     m.torno((x + 0.5, y + 0.1, 0.8), ((0.26, 0), (0.3, 0.2), (0.26, 0.42)), variar(VIGA), lados=12)
 
 
-def caja_baja(m, x, y, z, ancho, color=MADERA_CLARA):
-    """Caja abierta para la balda; devuelve la altura donde apoya lo que lleva."""
-    fondo = ESTANTE_FONDO - 0.14
-    m.caja((x, y, z + 0.09), (ancho, fondo, 0.18), variar(color))
-    return z + 0.18
+def item_zanahoria(m):
+    m.torno((0, 0, 0), ((0.012, 0), (0.05, 0.13), (0.045, 0.16)), ZANAHORIA, lados=7)
+    for dx, giro in ((-0.02, 0.35), (0.02, -0.35)):
+        m.caja((dx, 0, 0.2), (0.03, 0.02, 0.09), HOJA, Matrix.Rotation(giro, 3, "Y"))
 
 
-def bolas(m, x, y, z, ancho, r, color, perfil=None, n=None):
-    """Reparte frutos o bultos por una balda, en dos filas al tresbolillo."""
-    perfil = perfil or ((r * 0.5, 0), (r, r * 0.6), (r, r * 1.2), (r * 0.5, r * 1.8))
-    n = n or max(2, int(ancho / (r * 2.3)))
-    for fila, dy in enumerate((0.14, -0.14)):
-        for i in range(n):
-            px = x - ancho / 2 + (i + 0.5 + fila * 0.25) * ancho / n
-            m.torno((min(px, x + ancho / 2 - r), y + dy, z), perfil, variar(color, 0.1), lados=8)
+def item_tomate(m):
+    r = 0.085
+    m.torno((0, 0, 0), ((r * 0.5, 0), (r, r * 0.6), (r, r * 1.2), (r * 0.5, r * 1.8)), TOMATE, lados=9)
+    m.caja((0, 0, r * 1.85), (0.05, 0.05, 0.025), HOJA)
 
 
-def fila_zanahorias(m, x, y, z, ancho):
-    z = caja_baja(m, x, y, z, ancho)
-    for i in range(int(ancho / 0.14)):
-        for dy in (-0.14, 0.0, 0.14):
-            px = x - ancho / 2 + (i + 0.5) * 0.14
-            py = y + dy + RNG.uniform(-0.02, 0.02)
-            m.torno((px, py, z - 0.04), ((0.02, 0), (0.055, 0.1)), variar(ZANAHORIA, 0.1), lados=6)
-            m.caja((px, py, z + 0.1), (0.05, 0.03, 0.09), variar(HOJA, 0.15))
+def item_calabaza(m):
+    r = 0.2
+    m.torno((0, 0, 0), ((r * 0.5, 0), (r, r * 0.45), (r, r * 0.95), (r * 0.4, r * 1.35)), CALABAZA, lados=10)
+    m.caja((0, 0, r * 1.45), (0.04, 0.04, 0.07), HOJA)
 
 
-def fila_tomates(m, x, y, z, ancho):
-    z = caja_baja(m, x, y, z, ancho)
-    bolas(m, x, y, z - 0.03, ancho - 0.1, 0.075, TOMATE)
+def item_huevo(m):
+    """Huevo en su nido de paja: suelto no se sostendría en la balda."""
+    m.torno((0, 0, 0), ((0.06, 0), (0.09, 0.035), (0.08, 0.05)), MIMBRE, lados=8)
+    m.torno((0, 0, 0.03), ((0.025, 0), (0.06, 0.045), (0.05, 0.1), (0.012, 0.14)), HUEVO, lados=8)
 
 
-def fila_calabazas(m, x, y, z, ancho):
-    r = 0.17
-    perfil = ((r * 0.5, 0), (r, r * 0.45), (r, r * 0.95), (r * 0.4, r * 1.35))
-    for i in range(int(ancho / 0.5)):
-        px = x - ancho / 2 + (i + 0.5) * 0.5
-        m.torno((px, y, z), perfil, variar(CALABAZA, 0.1), lados=10)
-        m.caja((px, y, z + r * 1.45), (0.035, 0.035, 0.07), HOJA)
+def item_lana(m):
+    """Madeja de lana con una banda teñida."""
+    r = 0.13
+    m.torno((0, 0, 0), ((r * 0.5, 0), (r, r * 0.6), (r, r * 1.2), (r * 0.5, r * 1.8)), LANA, lados=9)
+    m.torno((0, 0, r * 0.75), ((r + 0.006, 0), (r + 0.006, r * 0.3)), LANA_TENIDA, lados=9)
 
 
-def fila_huevos(m, x, y, z, ancho):
-    """Cestas de mimbre con huevos."""
-    for i in range(3):
-        px = x + (i - 1) * ancho / 3
-        m.torno((px, y, z), ((0.14, 0), (0.21, 0.13), (0.21, 0.15)), variar(MIMBRE), lados=10)
-        for dx, dy in ((-0.09, 0), (0.09, 0), (0, 0.09), (0, -0.09), (0, 0)):
-            m.torno((px + dx, y + dy, z + 0.1), ((0.02, 0), (0.05, 0.04), (0.04, 0.09), (0.01, 0.12)), HUEVO, lados=7)
-
-
-def fila_lana(m, x, y, z, ancho):
-    """Madejas de lana, alguna teñida."""
-    bolas(m, x, y, z, ancho - 0.1, 0.13, LANA, n=max(2, int(ancho / 0.36)))
-    m.torno((x - 0.5, y, z + 0.2), ((0.05, 0), (0.12, 0.08), (0.12, 0.16), (0.05, 0.24)), LANA_TENIDA, lados=8)
-
-
-def fila_leche(m, x, y, z, ancho):
-    """Lecheras de metal."""
+def item_leche(m):
+    """Lechera de metal."""
     perfil = ((0.11, 0), (0.12, 0.2), (0.07, 0.3), (0.06, 0.36), (0.08, 0.38), (0.08, 0.41))
-    for i in range(int(ancho / 0.4)):
-        px = x - ancho / 2 + (i + 0.5) * 0.4
-        m.torno((px, y, z), perfil, variar(METAL_CLARO, 0.05), lados=10)
+    m.torno((0, 0, 0), perfil, METAL_CLARO, lados=10)
 
 
-def estanteria(m, bx, z0, fila):
-    """Estantería contra el muro del fondo, con todas las baldas de un mismo recurso."""
+def item_semilla(color):
+    """Sobre de semillas de pie, del color del cultivo."""
+
+    def sobre(m):
+        m.caja((0, 0, 0.1), (0.12, 0.035, 0.2), PAPEL)
+        m.caja((0, -0.019, 0.085), (0.1, 0.004, 0.13), color)
+        m.caja((0, 0, 0.205), (0.12, 0.04, 0.02), variar(color, 0.2))
+
+    return sobre
+
+
+# Una pieza de cada recurso, repetida por el juego según las existencias. La
+# separación entre ellas está en ITEM_STEP (src/world/warehouse.ts).
+PIEZAS = {
+    "zanahoria": item_zanahoria,
+    "tomate": item_tomate,
+    "calabaza": item_calabaza,
+    "huevo": item_huevo,
+    "lana": item_lana,
+    "leche": item_leche,
+    "semilla_zanahoria": item_semilla(ZANAHORIA),
+    "semilla_tomate": item_semilla(TOMATE),
+    "semilla_calabaza": item_semilla(SOBRE_CALABAZA),
+}
+
+
+def estanteria(m, bx, z0, an):
+    """Estantería vacía contra el muro del fondo, abierta al frente."""
     y = ESTANTE_Y
-    an, fo, al = ESTANTE_ANCHO, ESTANTE_FONDO, ESTANTE_ALTO
+    fo, al = ESTANTE_FONDO, ESTANTE_ALTO
     for sx in (-1, 1):
         for sy in (-1, 1):
             m.caja((bx + sx * (an / 2 - 0.05), y + sy * (fo / 2 - 0.04), z0 + al / 2), (0.09, 0.08, al), variar(VIGA))
     m.caja((bx, y + fo / 2 - 0.02, z0 + al / 2), (an - 0.1, 0.03, al - 0.1), variar(MADERA, 0.05))
     for z in (*BALDAS, ESTANTE_ALTO - 0.05):
         m.caja((bx, y, z0 + z), (an, fo, 0.05), variar(MADERA_CLARA))
-    for z in BALDAS:
-        fila(m, bx, y, z0 + z + 0.025, an - 0.3)
     # Tablero del rótulo: el juego le pone encima el nombre del recurso
     m.caja((bx, y - fo / 2 - 0.02, z0 + 1.98), (1.5, 0.03, 0.36), variar(VIGA, 0.04))
 
@@ -378,8 +381,8 @@ def planta_baja(m):
     escalera(m)
     zona_pienso(m)
     cajas(m)
-    for bx, fila in zip(ESTANTE_BX, (fila_zanahorias, fila_tomates, fila_calabazas)):
-        estanteria(m, bx, 0, fila)
+    for bx in SEMILLAS_BX:
+        estanteria(m, bx, 0, SEMILLAS_ANCHO)
 
 
 def altillo(m):
@@ -412,8 +415,8 @@ def altillo(m):
     fardo(m, -7.0, 1.32, z, 1.5, 0.6, 0.5)
     fardo(m, -7.0, 1.0, z + 0.5, 1.5, 0.6, 0.5)
 
-    for bx, fila in zip(ESTANTE_BX, (fila_huevos, fila_lana, fila_leche)):
-        estanteria(m, bx, z, fila)
+    for bx in PRODUCTOS_BX:
+        estanteria(m, bx, z, PRODUCTOS_ANCHO)
 
 
 def material(nombre, rugosidad):
@@ -455,7 +458,9 @@ def construir():
         material_textura("M_Arpillera", "arpillera.png"),
     )
     objetos = []
-    for nombre, pieza in (("SM_AlmacenBase", planta_baja), ("SM_AlmacenAltillo", altillo)):
+    mallas = [("SM_AlmacenBase", planta_baja), ("SM_AlmacenAltillo", altillo)]
+    mallas += [(f"Item_{nombre}", pieza) for nombre, pieza in PIEZAS.items()]
+    for nombre, pieza in mallas:
         m = Malla()
         pieza(m)
         bmesh.ops.recalc_face_normals(m.bm, faces=m.bm.faces)
@@ -465,6 +470,7 @@ def construir():
         for mat in mats:
             malla.materials.append(mat)
         obj = bpy.data.objects.new(nombre, malla)
+        obj.hide_render = nombre.startswith("Item_")  # en el origen: no van en la vista previa
         bpy.context.scene.collection.objects.link(obj)
         objetos.append(obj)
     return objetos

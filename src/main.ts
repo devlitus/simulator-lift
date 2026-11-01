@@ -108,13 +108,22 @@ const quests = new QuestSystem(state, bus, QUEST_DEFS);
 const world = new WorldView(scene, bus, { shadows: !lowSpec, pen: PEN });
 new SceneryView(scene, world, PEN, TREE_SPOTS);
 const homeInterior = new HomeInteriorView(scene);
-const warehouse = new WarehouseView(scene, {
-  shelf: (kind, id) =>
-    kind === 'crop'
-      ? `${CROPS[id].icon} ${CROPS[id].name}`
-      : `${ANIMALS[id].productIcon} ${ANIMALS[id].productName}`,
-  feed: (animal) => `${ANIMALS[animal].icon} ${ANIMALS[animal].name}`,
-});
+const warehouse = new WarehouseView(
+  scene,
+  {
+    shelf: (kind, id) => {
+      if (kind === 'seed') return `🌱 ${CROPS[id].name}`;
+      return kind === 'crop'
+        ? `${CROPS[id].icon} ${CROPS[id].name}`
+        : `${ANIMALS[id].productIcon} ${ANIMALS[id].productName}`;
+    },
+    feed: (animal) => `${ANIMALS[animal].icon} ${ANIMALS[animal].name}`,
+  },
+  (kind, id) => {
+    if (kind === 'seed') return state.seeds[id];
+    return kind === 'crop' ? state.produce[id] : state.animalProducts[id];
+  },
+);
 const player = new PlayerView(scene, world);
 const farmView = new FarmView(scene, state, bus, farmLogic, FARM_CONFIG, CROPS);
 const animalView = new AnimalView(scene, world, state, bus, animalLogic, ANIMALS, PEN);
@@ -336,10 +345,14 @@ function findInteraction(): Interaction | null {
 
   const spot = warehouseSpotAt(p.x, p.z, p.y);
   if (spot?.type === 'shelf') {
-    const label =
-      spot.kind === 'crop'
-        ? `${CROPS[spot.id].icon} Estantería de ${CROPS[spot.id].name}: ${state.produce[spot.id]}`
-        : `${ANIMALS[spot.id].productIcon} Estantería de ${ANIMALS[spot.id].productName}: ${state.animalProducts[spot.id]}`;
+    let label: string;
+    if (spot.kind === 'seed') {
+      label = `🌱 Semillas de ${CROPS[spot.id].name}: ${state.seeds[spot.id]}`;
+    } else if (spot.kind === 'crop') {
+      label = `${CROPS[spot.id].icon} Estantería de ${CROPS[spot.id].name}: ${state.produce[spot.id]}`;
+    } else {
+      label = `${ANIMALS[spot.id].productIcon} Estantería de ${ANIMALS[spot.id].productName}: ${state.animalProducts[spot.id]}`;
+    }
     candidates.push({ dist: spot.dist, label, action: null });
   } else if (spot?.type === 'feed') {
     const a = ANIMALS[spot.animal];

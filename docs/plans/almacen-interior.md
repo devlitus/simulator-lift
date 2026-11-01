@@ -10,9 +10,12 @@ entra por su puerta principal y todo el suelo es transitable, en los dos niveles
 
 ## Contenido
 
-- Una estantería por recurso: tres de cosecha (zanahoria, tomate, calabaza) en la
-  planta baja y tres de productos (huevo, lana, leche) en el altillo. Un test falla
-  si un cultivo o un animal de `data/` se queda sin la suya.
+- Altillo, zona de producto final: una estantería por producto (zanahoria, tomate,
+  calabaza, huevo, lana y leche).
+- Planta baja, bajo el altillo, zona de semillas: una estantería por cultivo. Un test
+  falla si un cultivo o un animal de `data/` se queda sin la suya.
+- Las estanterías muestran el inventario real: una pieza por unidad y vacías sin
+  existencias. Al llenarse dejan de crecer; la pista da siempre la cantidad exacta.
 - Zona del pienso con un box por animal (gallina, oveja y vaca), en la planta baja.
 - Dos niveles: el altillo cubre la mitad del fondo y se sube por una escalera de mano.
 
@@ -27,8 +30,10 @@ entra por su puerta principal y todo el suelo es transitable, en los dos niveles
   con la cámara a 45°. Por eso el GLB lleva dos mallas.
 - La fachada del almacén se cierra: desaparece el hueco de la puerta y el corte a
   media altura, que ya no hacen falta.
-- Sin mecánicas nuevas: el inventario sigue siendo global y las estanterías solo
-  informan de cuánto hay de su recurso. Semillas y regalos no tienen estantería.
+- Cada recurso es una pieza del GLB repetida con thin instances: una malla por
+  recurso y un solo dibujado, aunque haya decenas de unidades.
+- Sin mecánicas nuevas: el inventario sigue siendo global y las estanterías lo
+  reflejan, sin guardar nada. Los regalos no tienen estantería.
 
 ## Asset
 
