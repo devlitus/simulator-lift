@@ -18,6 +18,11 @@ body {
   height: 100%;
   display: block;
   outline: none;
+  cursor: grab;
+  touch-action: none; /* el arrastre mueve el mapa, no la página */
+}
+#renderCanvas.dragging {
+  cursor: grabbing;
 }
 
 /* El HUD no captura clics salvo en elementos interactivos */
