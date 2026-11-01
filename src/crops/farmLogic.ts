@@ -2,7 +2,7 @@
 // Plantar, regar, crecimiento por días, marchitez y cosecha sobre datos planos.
 // No crea meshes: la vista (src/crops/farmView.ts) refleja este estado.
 import { EVENTS, EventBus } from '../core/events';
-import { WILT_DAYS } from '../../data/farm';
+import { WATERING_CAN_CAPACITY, WILT_DAYS } from '../../data/farm';
 import type { CropDef } from '../../data/schemas';
 
 export interface TileCrop {
@@ -33,6 +33,7 @@ export interface TileStatus {
 export interface FarmState {
   seeds: Record<string, number>;
   produce: Record<string, number>;
+  water: number; // riegos que quedan en la regadera
 }
 
 export class FarmLogic {
@@ -74,10 +75,33 @@ export class FarmLogic {
   water(index: number): boolean {
     const c = this.tiles[index];
     if (!c || c.withered || c.watered) return false;
+    if (this.state.water <= 0) {
+      this.bus.emit(EVENTS.NOTIFY, '🪣 La regadera está vacía: llénala en el pozo');
+      return false;
+    }
+    this.state.water--;
     c.watered = true;
     this.bus.emit(EVENTS.FARM_CHANGED);
     this.bus.emit(EVENTS.FARM_WATERED, { index });
-    this.bus.emit(EVENTS.NOTIFY, '💧 Cultivo regado');
+    this.bus.emit(EVENTS.INVENTORY_CHANGED);
+    this.bus.emit(
+      EVENTS.NOTIFY,
+      `💧 Cultivo regado (${this.state.water}/${WATERING_CAN_CAPACITY})`,
+    );
+    return true;
+  }
+
+  /** La regadera admite agua (no está llena). */
+  canRefill(): boolean {
+    return this.state.water < WATERING_CAN_CAPACITY;
+  }
+
+  /** Llena la regadera en el pozo. Devuelve false si ya estaba llena. */
+  refillWater(): boolean {
+    if (!this.canRefill()) return false;
+    this.state.water = WATERING_CAN_CAPACITY;
+    this.bus.emit(EVENTS.INVENTORY_CHANGED);
+    this.bus.emit(EVENTS.NOTIFY, `🪣 Regadera llena (${WATERING_CAN_CAPACITY} riegos)`);
     return true;
   }
 

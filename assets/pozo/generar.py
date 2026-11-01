@@ -116,6 +116,23 @@ def arco(nombre, r_ext, r_int, z0, z1, ang0, ang1, mat, pasos=2, bisel=0.01):
     return acabado(obj, mat, bisel)
 
 
+# Piezas que el juego anima (grupo de vértices → malla exportada, pivote).
+# Se marcan antes de unir el pozo y se separan tras hornear, así comparten
+# atlas con el resto. Pivotes en coordenadas de Blender: arriba de la cuerda,
+# asa del cubo y eje del torno.
+PIEZAS = (
+    ("Cubo", "SM_Pozo_Cubo", (0.05, -0.084, 1.20)),
+    ("Cuerda", "SM_Pozo_Cuerda", (0.05, -0.084, 1.30)),
+    ("Manivela", "SM_Pozo_Manivela", (0.93, 0, 1.30)),
+)
+
+
+def marcar(obj, grupo):
+    vg = obj.vertex_groups.get(grupo) or obj.vertex_groups.new(name=grupo)
+    vg.add(list(range(len(obj.data.vertices))), 1.0, "REPLACE")
+    return obj
+
+
 def construir():
     # La colección propia permite repetir el script sin borrar trabajo ajeno.
     anterior = bpy.data.collections.get("Pozo")
@@ -166,9 +183,11 @@ def construir():
     barra("Torno", (-0.84, 0, 1.30), (0.87, 0, 1.30), 0.085, madera, 16)
     for x in (-0.88, 0.89):
         barra("Collarin", (x - 0.026, 0, 1.30), (x + 0.026, 0, 1.30), 0.112, hierro, 12)
-    caja("Manivela", (0.93, 0, 1.16), (0.075, 0.08, 0.34), hierro, 0.005)
-    barra("Empuñadura", (0.94, 0, 1.02), (1.11, 0, 1.02), 0.048, madera)
-    barra("Cuerda_colgante", (0.05, -0.084, 1.30), (0.05, -0.084, 0.13), 0.018, cuerda, 8)
+    marcar(caja("Manivela", (0.93, 0, 1.16), (0.075, 0.08, 0.34), hierro, 0.005), "Manivela")
+    marcar(barra("Empuñadura", (0.94, 0, 1.02), (1.11, 0, 1.02), 0.048, madera), "Manivela")
+    # La cuerda baja del torno al asa del cubo; el juego la estira al bajarlo.
+    marcar(barra("Cuerda_colgante", (0.05, -0.084, 1.30), (0.05, -0.084, 1.20), 0.018,
+                 cuerda, 8), "Cuerda")
     for i in range(9):
         bpy.ops.mesh.primitive_torus_add(major_segments=12, minor_segments=4,
                                        location=(-0.10 + i * 0.023, 0, 1.30),
@@ -196,23 +215,25 @@ def construir():
             obj = caja("Remate_tejado", (a + b) / 2, (0.07, 0.08, (b - a).length), canto)
             obj.rotation_euler = (b - a).to_track_quat("Z", "Y").to_euler()
 
-    # Cubo abierto con duelas y aros, apoyado en el borde frontal.
-    cx, cy, cz = 0.32, -0.55, 0.81
+    # Cubo abierto con duelas y aros, colgado de la cuerda sobre el hueco.
+    cx, cy, cz = 0.05, -0.084, 0.84
     for i in range(12):
         ang = i * math.tau / 12
         obj = arco("Duela", 0.128, 0.103, 0, 0.24, ang + 0.01,
                    ang + math.tau / 12 - 0.01, madera, pasos=1, bisel=0.003)
         obj.location = (cx, cy, cz)
-    barra("Base_cubo", (cx, cy, cz), (cx, cy, cz + 0.018), 0.112, canto, 12)
+        marcar(obj, "Cubo")
+    marcar(barra("Base_cubo", (cx, cy, cz), (cx, cy, cz + 0.018), 0.112, canto, 12), "Cubo")
     for altura in (0.045, 0.195):
         obj = arco("Aro_cubo", 0.135, 0.123, 0, 0.025, 0, math.tau,
                    hierro, pasos=16, bisel=0)
         obj.location = (cx, cy, cz + altura)
+        marcar(obj, "Cubo")
     for lado in (-1, 1):
-        barra("Asa_cubo", (cx + lado * 0.14, cy, cz + 0.18),
-              (cx + lado * 0.14, cy, cz + 0.36), 0.012, hierro, 6)
-    barra("Asa_cubo_superior", (cx - 0.14, cy, cz + 0.36),
-          (cx + 0.14, cy, cz + 0.36), 0.016, hierro, 8)
+        marcar(barra("Asa_cubo", (cx + lado * 0.14, cy, cz + 0.18),
+                     (cx + lado * 0.14, cy, cz + 0.36), 0.012, hierro, 6), "Cubo")
+    marcar(barra("Asa_cubo_superior", (cx - 0.14, cy, cz + 0.36),
+                 (cx + 0.14, cy, cz + 0.36), 0.016, hierro, 8), "Cubo")
 
     # Un objeto/un material final por LOD reduce las llamadas de dibujo.
     piezas = [o for o in coleccion.objects if o.type == "MESH"]
@@ -354,8 +375,29 @@ def exportar():
     activar(obj)
     tri = obj.modifiers.new("Triangulos_exportacion", "TRIANGULATE")
     bpy.ops.object.modifier_apply(modifier=tri.name)
+    # Cubo, cuerda y manivela salen como mallas propias (sin LOD: son pocas
+    # caras) para que el juego las anime; comparten material y atlas.
+    piezas = []
+    for grupo, nombre, pivote in PIEZAS:
+        activar(obj)
+        bpy.ops.object.mode_set(mode="EDIT")
+        bpy.ops.mesh.select_all(action="DESELECT")
+        obj.vertex_groups.active_index = obj.vertex_groups[grupo].index
+        bpy.ops.object.vertex_group_select()
+        bpy.ops.mesh.separate(type="SELECTED")
+        bpy.ops.object.mode_set(mode="OBJECT")
+        pieza = next(o for o in bpy.context.selected_objects if o is not obj)
+        pieza.name = nombre
+        pieza.data.name = nombre
+        bpy.context.scene.cursor.location = pivote
+        activar(pieza)
+        bpy.ops.object.origin_set(type="ORIGIN_CURSOR")
+        piezas.append(pieza)
+    bpy.context.scene.cursor.location = (0, 0, 0)
+    for o in [obj, *piezas]:
+        o.vertex_groups.clear()
     lods = [obj]
-    # El 30 % conserva cerradas las duelas finas del cubo en el último LOD.
+    # El 30 % conserva cerradas las piezas finas en el último LOD.
     for nivel, ratio in ((1, 0.50), (2, 0.30)):
         lod = obj.copy()
         lod.data = obj.data.copy()
@@ -377,7 +419,7 @@ def exportar():
         lod.data.materials.append(simple)
         lods.append(lod)
     bpy.ops.object.select_all(action="DESELECT")
-    for lod in lods:
+    for lod in [*lods, *piezas]:
         lod.hide_set(False)
         lod.select_set(True)
     bpy.context.view_layer.objects.active = obj
@@ -395,7 +437,7 @@ def exportar():
     bpy.ops.file.pack_all()
     activar(obj)
     metricas = []
-    for lod in lods:
+    for lod in [*lods, *piezas]:
         lod.data.calc_loop_triangles()
         bm = bmesh.new()
         bm.from_mesh(lod.data)

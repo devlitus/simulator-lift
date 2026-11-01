@@ -11,3 +11,6 @@ export const FARM_CONFIG: FarmConfig = FarmConfigSchema.parse({
 
 // Días consecutivos sin regar antes de que un cultivo se marchite
 export const WILT_DAYS = 2;
+
+// Riegos que caben en la regadera; se rellena en el pozo junto a la parcela
+export const WATERING_CAN_CAPACITY = 5;

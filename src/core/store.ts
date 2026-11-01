@@ -1,6 +1,7 @@
 // Store: crea el estado central del juego a partir de los archivos de datos.
 // Es un objeto plano mutable compartido: los sistemas de dominio lo mutan y
 // notifican el cambio emitiendo eventos por el EventBus (ver core/events.ts).
+import { WATERING_CAN_CAPACITY } from '../../data/farm';
 import type { AnimalDef, BalanceConfig, CropDef, GiftDef, NpcDef } from '../../data/schemas';
 
 // Forma del estado central compartido por todos los sistemas de dominio.
@@ -14,6 +15,7 @@ export interface GameState {
   produce: Record<string, number>;
   gifts: Record<string, number>;
   feed: number; // pienso disponible para alimentar animales
+  water: number; // riegos que quedan en la regadera (se llena en el pozo)
   animalProducts: Record<string, number>; // productos de granja por especie (huevos, leche, lana…)
   selectedSeed: string;
   /** puntos de amistad por id de NPC */
@@ -51,6 +53,7 @@ export function createInitialState(
     produce,
     gifts,
     feed: balance.startFeed,
+    water: WATERING_CAN_CAPACITY,
     animalProducts,
     selectedSeed: Object.keys(cropsData)[0],
     friendships,

@@ -41,6 +41,7 @@ export const SaveSchema = z.object({
   produce: z.record(z.number()).optional(),
   gifts: z.record(z.number()).optional(),
   feed: z.number().optional(),
+  water: z.number().optional(),
   animalProducts: z.record(z.number()).optional(),
   selectedSeed: z.string().optional(),
   friendships: z.record(z.number()).optional(),
@@ -78,6 +79,7 @@ export function buildSave(
     produce: { ...state.produce },
     gifts: { ...state.gifts },
     feed: state.feed,
+    water: state.water,
     animalProducts: { ...state.animalProducts },
     selectedSeed: state.selectedSeed,
     friendships: { ...state.friendships },
@@ -103,6 +105,7 @@ export function applySave(
   Object.assign(state.produce, d.produce || {});
   Object.assign(state.gifts, d.gifts || {});
   state.feed = d.feed ?? state.feed;
+  state.water = d.water ?? state.water;
   Object.assign(state.animalProducts, d.animalProducts || {});
   state.selectedSeed = d.selectedSeed || state.selectedSeed;
   Object.assign(state.friendships, d.friendships || {});

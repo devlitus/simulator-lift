@@ -20,7 +20,7 @@ import { GIFTS } from '../../data/gifts';
 import { NPC_DEFS } from '../../data/npcs';
 import { ANIMALS, ANIMAL_FEED } from '../../data/animals';
 import { QUEST_DEFS } from '../../data/quests';
-import { FARM_CONFIG } from '../../data/farm';
+import { FARM_CONFIG, WATERING_CAN_CAPACITY } from '../../data/farm';
 
 const TILE_COUNT = FARM_CONFIG.cols * FARM_CONFIG.rows;
 const DAYS = 90; // ~3 meses de juego por seed
@@ -74,6 +74,9 @@ function checkInvariants(w: World, doneQuests: Set<string>): void {
   // Dinero y contadores: siempre enteros y nunca negativos
   expect(Number.isInteger(state.money) && state.money >= 0).toBe(true);
   expect(Number.isInteger(state.feed) && state.feed >= 0).toBe(true);
+  expect(Number.isInteger(state.water)).toBe(true);
+  expect(state.water).toBeGreaterThanOrEqual(0);
+  expect(state.water).toBeLessThanOrEqual(WATERING_CAN_CAPACITY);
   for (const rec of [state.seeds, state.produce, state.gifts, state.animalProducts]) {
     for (const v of Object.values(rec)) {
       expect(Number.isInteger(v) && v >= 0).toBe(true);
@@ -119,9 +122,13 @@ function randomAction(w: World, rng: () => number): string {
     w.farm.plant(randInt(rng, TILE_COUNT), pick(rng, cropKeys));
     return 'plant';
   }
-  if (r < 0.3) {
+  if (r < 0.27) {
     w.farm.water(randInt(rng, TILE_COUNT));
     return 'water';
+  }
+  if (r < 0.3) {
+    w.farm.refillWater();
+    return 'refillWater';
   }
   if (r < 0.4) {
     w.farm.harvest(randInt(rng, TILE_COUNT));

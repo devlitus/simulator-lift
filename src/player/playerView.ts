@@ -1,6 +1,7 @@
 // PlayerView (vista Babylon): avatar del jugador con física (impostor de caja)
 // y movimiento con WASD / flechas. Sin reglas de juego: solo traduce input a
-// velocidad y reproduce las animaciones (caminar, reposo, regar).
+// velocidad y reproduce las animaciones (caminar, reposo, regar). Mientras
+// gira la manivela del pozo se queda quieto mirándolo.
 import { CONFIG } from '../core/constants';
 import type { WorldView } from '../world/worldView';
 import { SceneLoader } from '@babylonjs/core/Loading/sceneLoader';
@@ -30,6 +31,7 @@ export class PlayerView {
   private _aguaPos = new Vector3(); // emisor del chorro
   private _riego = 0; // segundos que faltan de la animación de riego
   private _riegoTotal = 0;
+  private _recarga = 0; // segundos que faltan de girar la manivela
 
   constructor(scene: Scene, world: WorldView) {
     this.scene = scene;
@@ -164,9 +166,9 @@ export class PlayerView {
     this._animActual = siguiente;
   }
 
-  /** Mientras riega, el granjero no se mueve ni interactúa. */
+  /** Mientras riega o llena la regadera, el granjero no se mueve ni interactúa. */
   get busy(): boolean {
-    return this._riego > 0;
+    return this._riego > 0 || this._recarga > 0;
   }
 
   // Riega el surco en (x, z): se gira hacia él, saca la regadera y reproduce
@@ -187,6 +189,17 @@ export class PlayerView {
     this._regadera?.setEnabled(true);
     water.start(false);
     this._animActual = 'water';
+  }
+
+  // Gira la manivela del pozo de (x, z): mirándolo y sin moverse durante
+  // `segundos` (lo que tarda el cubo en bajar y subir, ver wellView).
+  playRefill(well: { x: number; z: number }, segundos: number): void {
+    const p = this.root.position;
+    this.visual.rotation.y = Math.atan2(well.x - p.x, well.z - p.z);
+    const imp = this._imp;
+    imp.setLinearVelocity(new Vector3(0, imp.getLinearVelocity()?.y ?? 0, 0));
+    this._recarga = segundos;
+    this._animar(false);
   }
 
   // Chorro de agua: partículas pequeñas que caen desde la alcachofa
@@ -256,10 +269,9 @@ export class PlayerView {
   // directo al mundo: W/arriba = -z (alejarse, arriba en pantalla),
   // D/derecha = -x (derecha en pantalla).
   update(dt: number, keys: Record<string, boolean>, canMove: boolean): void {
-    if (this.busy) {
-      this._actualizarRiego(dt);
-      canMove = false;
-    }
+    if (this._riego > 0) this._actualizarRiego(dt);
+    if (this._recarga > 0) this._recarga = Math.max(0, this._recarga - dt);
+    if (this.busy) canMove = false;
     let ix = 0;
     let iz = 0;
     if (canMove) {

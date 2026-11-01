@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { EventBus, EVENTS } from '../core/events';
 import { FarmLogic, TILE_STATUS, type FarmState } from './farmLogic';
-import { WILT_DAYS } from '../../data/farm';
+import { WATERING_CAN_CAPACITY, WILT_DAYS } from '../../data/farm';
 import type { CropDef } from '../../data/schemas';
 
 const CROPS: Record<string, CropDef> = {
@@ -16,7 +16,7 @@ const CROPS: Record<string, CropDef> = {
 };
 
 function makeState(): FarmState {
-  return { seeds: { zanahoria: 2 }, produce: { zanahoria: 0 } };
+  return { seeds: { zanahoria: 2 }, produce: { zanahoria: 0 }, water: WATERING_CAN_CAPACITY };
 }
 
 describe('FarmLogic', () => {
@@ -53,6 +53,36 @@ describe('FarmLogic', () => {
     expect(farm.water(1)).toBe(true);
     expect(farm.water(1)).toBe(false); // ya regado
     expect(regados).toEqual([1]);
+  });
+
+  it('cada riego gasta agua de la regadera y vacía no riega', () => {
+    state.seeds.zanahoria = 4;
+    for (let i = 0; i < 4; i++) farm.plant(i, 'zanahoria');
+    state.water = 2;
+    expect(farm.water(0)).toBe(true);
+    expect(farm.water(1)).toBe(true);
+    expect(state.water).toBe(0);
+    expect(farm.water(2)).toBe(false); // regadera vacía
+    expect(farm.tiles[2]!.watered).toBe(false);
+    expect(state.water).toBe(0);
+  });
+
+  it('regar un surco que no lo necesita no gasta agua', () => {
+    expect(farm.water(0)).toBe(false); // vacío
+    farm.plant(0, 'zanahoria');
+    farm.water(0);
+    expect(farm.water(0)).toBe(false); // ya regado
+    expect(state.water).toBe(WATERING_CAN_CAPACITY - 1);
+  });
+
+  it('el pozo llena la regadera hasta su capacidad', () => {
+    expect(farm.canRefill()).toBe(false);
+    expect(farm.refillWater()).toBe(false); // ya llena
+    state.water = 0;
+    expect(farm.canRefill()).toBe(true);
+    expect(farm.refillWater()).toBe(true);
+    expect(state.water).toBe(WATERING_CAN_CAPACITY);
+    expect(farm.canRefill()).toBe(false);
   });
 
   it('crece un día por cada día regado hasta madurar', () => {

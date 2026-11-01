@@ -20,6 +20,7 @@ import { TransformNode } from '@babylonjs/core/Meshes/transformNode';
 import { PhysicsImpostor } from '@babylonjs/core/Physics/v1/physicsImpostor';
 import { Scene } from '@babylonjs/core/scene';
 import type { ISceneLoaderAsyncResult, Node } from '@babylonjs/core';
+import { WellView } from './wellView';
 
 interface PathTile {
   x: number;
@@ -67,6 +68,9 @@ export class WorldView {
   ground!: Mesh; // superficie física; SceneryView la oculta al cargar las colinas
   pen: PenConfig;
   sellBin: { x: number; z: number };
+  well: { x: number; z: number };
+  wellCrank: { x: number; z: number }; // donde se pone el granjero para girar la manivela
+  wellView: WellView | null = null; // animación del cubo (si carga el GLB)
   storageCut = false; // el granjero está dentro del almacén
 
   constructor(
@@ -105,6 +109,10 @@ export class WorldView {
     // almacén y mirando a las parcelas (main.ts lo usa como interactuable).
     // La puerta del almacén ya no es interactuable: la sustituye el puesto.
     this.sellBin = { x: 11.6, z: 8 };
+    this.well = { x: 3.7, z: 10.3 }; // junto a la parcela, al sur
+    // La manivela sale por el lado -x del pozo (a la derecha en pantalla):
+    // pozo.glb la tiene en +x de Blender y la conversión de ejes la refleja.
+    this.wellCrank = { x: this.well.x - 1.35, z: this.well.z };
 
     this.buildGround();
     this.buildBounds();
@@ -867,13 +875,13 @@ export class WorldView {
     }
   }
 
-  // Pozo de la plaza: colisión estable durante la carga y si falla el GLB.
+  // Pozo junto a la granja: colisión estable durante la carga y si falla el GLB.
   buildWell(): void {
     const root = new TransformNode('wellRoot', this.scene);
-    root.position.set(-3, 0.04, -4); // Apoyado sobre el camino de la plaza.
+    root.position.set(this.well.x, 0, this.well.z); // Sobre el césped, al sur de la parcela.
 
     const hit = MeshBuilder.CreateBox('wellHit', { width: 1.6, height: 1, depth: 1.6 }, this.scene);
-    hit.position.set(-3, 0.54, -4);
+    hit.position.set(this.well.x, 0.5, this.well.z);
     hit.isVisible = false;
     hit.physicsImpostor = new PhysicsImpostor(
       hit,
@@ -929,6 +937,20 @@ export class WorldView {
       this.addShadow(lod0);
       this.shadow?.removeShadowCaster(fallback);
       fallback.dispose(false, true);
+
+      // Cubo, cuerda y manivela vienen como mallas sueltas para animarlas
+      const pieza = (name: string) => imported!.meshes.find((m) => m.name === name);
+      const cubo = pieza('SM_Pozo_Cubo');
+      const cuerda = pieza('SM_Pozo_Cuerda');
+      const manivela = pieza('SM_Pozo_Manivela');
+      if (cubo && cuerda && manivela) {
+        for (const m of [cubo, cuerda, manivela]) this.addShadow(m);
+        root.computeWorldMatrix(true);
+        for (const n of [model, ...model.getDescendants(false)]) {
+          (n as TransformNode).computeWorldMatrix?.(true);
+        }
+        this.wellView = new WellView(this.scene, { cubo, cuerda, manivela });
+      }
     } catch {
       // El respaldo y su colisión siguen disponibles incluso con un GLB inválido.
       if (imported) {
@@ -1119,6 +1141,7 @@ export class WorldView {
   }
 
   update(dt: number, day: number): void {
+    this.wellView?.update(dt);
     this.time += dt / CONFIG.dayLengthSeconds;
     if (this.time >= 1) {
       this.time -= 1;

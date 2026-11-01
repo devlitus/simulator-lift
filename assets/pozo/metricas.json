@@ -1,22 +1,43 @@
 [
   {
     "nombre": "SM_Pozo_LOD0",
-    "triangulos": 4800,
-    "vertices": 2628,
+    "triangulos": 4254,
+    "vertices": 2317,
     "aristas_no_manifold": 0,
     "caras_degeneradas": 0
   },
   {
     "nombre": "SM_Pozo_LOD1",
-    "triangulos": 2400,
-    "vertices": 1428,
+    "triangulos": 2126,
+    "vertices": 1253,
     "aristas_no_manifold": 0,
     "caras_degeneradas": 0
   },
   {
     "nombre": "SM_Pozo_LOD2",
-    "triangulos": 1440,
-    "vertices": 948,
+    "triangulos": 1276,
+    "vertices": 828,
+    "aristas_no_manifold": 0,
+    "caras_degeneradas": 0
+  },
+  {
+    "nombre": "SM_Pozo_Cubo",
+    "triangulos": 484,
+    "vertices": 274,
+    "aristas_no_manifold": 0,
+    "caras_degeneradas": 0
+  },
+  {
+    "nombre": "SM_Pozo_Cuerda",
+    "triangulos": 14,
+    "vertices": 9,
+    "aristas_no_manifold": 0,
+    "caras_degeneradas": 0
+  },
+  {
+    "nombre": "SM_Pozo_Manivela",
+    "triangulos": 48,
+    "vertices": 28,
     "aristas_no_manifold": 0,
     "caras_degeneradas": 0
   }
