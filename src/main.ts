@@ -46,6 +46,23 @@ import {
   INTERIOR_EXIT,
   isIndoors,
 } from './world/homeInterior';
+import {
+  canClimbDown,
+  canClimbUp,
+  canEnterStorage,
+  canLeaveWarehouse,
+  isInWarehouse,
+  isUnderLoft,
+  LADDER_FOOT,
+  LADDER_PATH,
+  LADDER_TOP,
+  STORAGE_DOOR_SPOT,
+  WAREHOUSE,
+  WAREHOUSE_ENTRY,
+  WAREHOUSE_EXIT,
+  warehouseSpotAt,
+} from './world/warehouse';
+import { WarehouseView } from './world/warehouseView';
 import { SceneryView } from './world/sceneryView';
 import { PlayerView } from './player/playerView';
 import { FarmLogic } from './crops/farmLogic';
@@ -91,6 +108,22 @@ const quests = new QuestSystem(state, bus, QUEST_DEFS);
 const world = new WorldView(scene, bus, { shadows: !lowSpec, pen: PEN });
 new SceneryView(scene, world, PEN, TREE_SPOTS);
 const homeInterior = new HomeInteriorView(scene);
+const warehouse = new WarehouseView(
+  scene,
+  {
+    shelf: (kind, id) => {
+      if (kind === 'seed') return `🌱 ${CROPS[id].name}`;
+      return kind === 'crop'
+        ? `${CROPS[id].icon} ${CROPS[id].name}`
+        : `${ANIMALS[id].productIcon} ${ANIMALS[id].productName}`;
+    },
+    feed: (animal) => `${ANIMALS[animal].icon} ${ANIMALS[animal].name}`,
+  },
+  (kind, id) => {
+    if (kind === 'seed') return state.seeds[id];
+    return kind === 'crop' ? state.produce[id] : state.animalProducts[id];
+  },
+);
 const player = new PlayerView(scene, world);
 const farmView = new FarmView(scene, state, bus, farmLogic, FARM_CONFIG, CROPS);
 const animalView = new AnimalView(scene, world, state, bus, animalLogic, ANIMALS, PEN);
@@ -114,12 +147,12 @@ const saveRepo = new SaveRepository(window.localStorage);
 const CRANK_RADIUS = 0.9;
 // Cruzar la puerta es más breve que dormir: basta un instante a oscuras.
 const DOOR_HOLD_MS = 150;
-// Dentro de casa la cámara no dibuja más allá de la estancia: el pueblo no se
+// En un interior la cámara no dibuja más allá de la estancia: el pueblo no se
 // ve y no cuesta nada.
 const INDOORS_MAX_Z = 60;
-const INDOORS_ZOOM = 13;
-// Encuadre fijo de la casa, algo al sur de su centro para que la pista no tape el frente
-const INDOORS_FOCUS = { x: HOME_INTERIOR.x, z: HOME_INTERIOR.z + 1.2 };
+// Encuadre fijo, algo al sur del centro para que la pista no tape el frente
+const HOME_VIEW = { x: HOME_INTERIOR.x, z: HOME_INTERIOR.z + 1.2, zoom: 13 };
+const WAREHOUSE_VIEW = { x: WAREHOUSE.x, z: WAREHOUSE.z + 0.6, zoom: 15 };
 
 // ---------- Cámara de seguimiento estilo Stardew ----------
 // Vista aérea con orientación fija (pitch 45°, mirando hacia -z): la cámara
@@ -139,10 +172,16 @@ canvas.addEventListener('wheel', (e) => {
   );
 });
 
+function interiorViewAt(x: number, z: number): typeof HOME_VIEW | null {
+  if (isIndoors(x, z)) return HOME_VIEW;
+  return isInWarehouse(x, z) ? WAREHOUSE_VIEW : null;
+}
+
 function updateCamera(dt: number): void {
-  // Dentro de casa, la cámara queda fija con toda la vivienda en el encuadre
-  const p = world.indoors ? INDOORS_FOCUS : player.position;
-  const zoom = world.indoors ? INDOORS_ZOOM : camZoom;
+  // En un interior, la cámara queda fija con toda la estancia en el encuadre
+  const vista = interiorViewAt(player.position.x, player.position.z);
+  const p = vista ?? player.position;
+  const zoom = vista ? vista.zoom : camZoom;
   // Suavizado de posición independiente del framerate (≈5/s)
   const alpha = 1 - Math.exp(-5 * dt);
   camTarget.x += (p.x - camTarget.x) * alpha;
@@ -188,13 +227,13 @@ function drawWater(): void {
   player.playRefill(world.well, segundos);
 }
 
-// ---------- Casa: entrar, salir y dormir ----------
+// ---------- Casa y almacén: entrar, salir y dormir ----------
 // La puerta cambia de escenario: con la pantalla a oscuras el granjero pasa a
-// la estancia (homeInterior) o vuelve al porche, y la cámara va con él.
+// la estancia (homeInterior, warehouse) o vuelve afuera, y la cámara va con él.
 function moveThroughDoor(x: number, z: number, heading: number): void {
   ui.fadeToBlack(() => {
     player.teleport(x, z, heading);
-    const foco = isIndoors(x, z) ? INDOORS_FOCUS : { x, z };
+    const foco = interiorViewAt(x, z) ?? { x, z };
     camTarget.x = foco.x;
     camTarget.z = foco.z;
   }, DOOR_HOLD_MS);
@@ -265,6 +304,62 @@ function findInteraction(): Interaction | null {
       label: 'Intro ↵: Salir de casa 🚪',
       action: () => moveThroughDoor(DOOR_SPOT.x, DOOR_SPOT.z, 0),
       key: 'enter',
+    });
+  }
+
+  if (canEnterStorage(p.x, p.z)) {
+    candidates.push({
+      dist: 0, // justo delante de la puerta no hay nada más que hacer
+      label: 'Intro ↵: Entrar en el almacén 📦',
+      action: () => moveThroughDoor(WAREHOUSE_ENTRY.x, WAREHOUSE_ENTRY.z, Math.PI / 2),
+      key: 'enter',
+    });
+  }
+
+  if (canLeaveWarehouse(p.x, p.z, p.y)) {
+    candidates.push({
+      dist: Math.hypot(p.x - WAREHOUSE_EXIT.x, p.z - WAREHOUSE_EXIT.z),
+      label: 'Intro ↵: Salir del almacén 🚪',
+      action: () => moveThroughDoor(STORAGE_DOOR_SPOT.x, STORAGE_DOOR_SPOT.z, -Math.PI / 2),
+      key: 'enter',
+    });
+  }
+
+  if (canClimbUp(p.x, p.z, p.y)) {
+    candidates.push({
+      dist: Math.hypot(p.x - LADDER_FOOT.x, p.z - LADDER_FOOT.z),
+      label: 'Intro ↵: Subir al altillo 🪜',
+      action: () => player.climb(LADDER_PATH),
+      key: 'enter',
+    });
+  }
+
+  if (canClimbDown(p.x, p.z, p.y)) {
+    candidates.push({
+      dist: Math.hypot(p.x - LADDER_TOP.x, p.z - LADDER_TOP.z),
+      label: 'Intro ↵: Bajar por la escalera 🪜',
+      action: () => player.climb([...LADDER_PATH].reverse()),
+      key: 'enter',
+    });
+  }
+
+  const spot = warehouseSpotAt(p.x, p.z, p.y);
+  if (spot?.type === 'shelf') {
+    let label: string;
+    if (spot.kind === 'seed') {
+      label = `🌱 Semillas de ${CROPS[spot.id].name}: ${state.seeds[spot.id]}`;
+    } else if (spot.kind === 'crop') {
+      label = `${CROPS[spot.id].icon} Estantería de ${CROPS[spot.id].name}: ${state.produce[spot.id]}`;
+    } else {
+      label = `${ANIMALS[spot.id].productIcon} Estantería de ${ANIMALS[spot.id].productName}: ${state.animalProducts[spot.id]}`;
+    }
+    candidates.push({ dist: spot.dist, label, action: null });
+  } else if (spot?.type === 'feed') {
+    const a = ANIMALS[spot.animal];
+    candidates.push({
+      dist: spot.dist,
+      label: `${a.icon} Pienso para ${a.name}: tienes ${state.feed} ${ANIMAL_FEED.icon}`,
+      action: null,
     });
   }
 
@@ -361,15 +456,16 @@ else ui.toggleHelp(true); // primera vez: mostrar ayuda
 engine.runRenderLoop(() => {
   const dt = Math.min(engine.getDeltaTime() / 1000, 0.1); // tope anti-saltos
   // Se deduce de la posición: el escenario no puede quedar desfasado del granjero
-  world.indoors = isIndoors(player.position.x, player.position.z);
+  const { x: px, y: py, z: pz } = player.position;
+  world.indoors = interiorViewAt(px, pz) !== null;
   camera.maxZ = world.indoors ? INDOORS_MAX_Z : OUTDOORS_MAX_Z;
   document.body.classList.toggle('indoors', world.indoors); // el CSS oculta el HUD de fuera
   world.update(dt, state.day);
   homeInterior.update(dt, world.daylight);
+  warehouse.update(dt, world.daylight, isUnderLoft(px, pz, py));
 
   const canMove = !ui.modalOpen && !player.busy;
   player.update(dt, keys, canMove);
-  world.updateStorageCutaway(player.position.x, player.position.z);
   npcs.update(dt);
   animalView.update(dt);
   updateCamera(dt);

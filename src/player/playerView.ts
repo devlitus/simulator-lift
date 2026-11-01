@@ -4,6 +4,7 @@
 // gira la manivela del pozo se queda quieto mirándolo.
 import { CONFIG } from '../core/constants';
 import { floorHeightAt } from '../world/farmerPorch';
+import { pointOnPath, type Point3 } from '../world/warehouse';
 import type { WorldView } from '../world/worldView';
 import { SceneLoader } from '@babylonjs/core/Loading/sceneLoader';
 import { DynamicTexture } from '@babylonjs/core/Materials/Textures/dynamicTexture';
@@ -17,6 +18,7 @@ import { PhysicsImpostor } from '@babylonjs/core/Physics/v1/physicsImpostor';
 import type { AnimationGroup, Mesh, Node, Scene } from '@babylonjs/core';
 
 const STEP_RATE = 14; // rapidez con la que los pies alcanzan la altura del peldaño (1/s)
+const CLIMB_SPEED = 1.8; // metros por segundo por la escalera de mano
 
 export class PlayerView {
   scene: Scene;
@@ -36,6 +38,7 @@ export class PlayerView {
   private _riegoTotal = 0;
   private _recarga = 0; // segundos que faltan de girar la manivela
   private _altura = 0; // altura de los pies sobre el césped (peldaños del porche)
+  private _subida: { path: Point3[]; t: number; total: number } | null = null; // en la escalera
 
   constructor(scene: Scene, world: WorldView) {
     this.scene = scene;
@@ -172,7 +175,7 @@ export class PlayerView {
 
   /** Mientras riega o llena la regadera, el granjero no se mueve ni interactúa. */
   get busy(): boolean {
-    return this._riego > 0 || this._recarga > 0;
+    return this._riego > 0 || this._recarga > 0 || this._subida !== null;
   }
 
   // Riega el surco en (x, z): se gira hacia él, saca la regadera y reproduce
@@ -204,6 +207,31 @@ export class PlayerView {
     imp.setLinearVelocity(new Vector3(0, imp.getLinearVelocity()?.y ?? 0, 0));
     this._recarga = segundos;
     this._animar(false);
+  }
+
+  // Recorre `path` (la escalera de mano, ver warehouse.ts) sin chocar con nada:
+  // el borde del altillo y su barandilla quedan en el camino.
+  climb(path: Point3[]): void {
+    const total = path
+      .slice(1)
+      .reduce((s, p, i) => s + Math.hypot(p.x - path[i].x, p.y - path[i].y, p.z - path[i].z), 0);
+    this.visual.rotation.y = Math.PI; // de espaldas a la cámara, hacia la escalera
+    this._subida = { path, t: 0, total: total / CLIMB_SPEED };
+    this._imp.physicsBody.collisionResponse = false;
+    this._animar(true);
+  }
+
+  private _actualizarSubida(dt: number): void {
+    const subida = this._subida!;
+    subida.t += dt;
+    const p = pointOnPath(subida.path, subida.t / subida.total);
+    this.root.position.set(p.x, p.y, p.z);
+    this._imp.setLinearVelocity(Vector3.Zero());
+    if (subida.t >= subida.total) {
+      this._subida = null;
+      this._imp.physicsBody.collisionResponse = true;
+      this._animar(false);
+    }
   }
 
   // Chorro de agua: partículas pequeñas que caen desde la alcachofa
@@ -284,6 +312,10 @@ export class PlayerView {
   update(dt: number, keys: Record<string, boolean>, canMove: boolean): void {
     if (this._riego > 0) this._actualizarRiego(dt);
     if (this._recarga > 0) this._recarga = Math.max(0, this._recarga - dt);
+    if (this._subida) {
+      this._actualizarSubida(dt);
+      return;
+    }
     if (this.busy) canMove = false;
     let ix = 0;
     let iz = 0;
