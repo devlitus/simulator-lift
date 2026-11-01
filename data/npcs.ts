@@ -24,11 +24,11 @@ export const NPC_DEFS: NpcDef[] = NpcsSchema.parse([
     name: 'Gon',
     role: 'Herrero',
     color: [0.48, 0.5, 0.55], // gris
-    home: { x: -13, z: -4 },
+    home: { x: -16, z: -4 },
     waypoints: [
-      [-13, -4],
-      [-9, -7],
-    ], // patrulla entre la forja y el camino
+      [-16, -4],
+      [-10, -4],
+    ], // patrulla por el camino, delante de su forja (barrio de los vecinos)
     shop: null,
     dialogs: [
       'Hmm. ¿Quién eres tú? Estoy ocupado, habla rápido.',

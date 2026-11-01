@@ -6,9 +6,7 @@ export const TREE_SPOTS: number[][] = [
   [-13, 6],
   [-20, 3],
   [9, -13.5], // tras la floristería
-  [-7, -14],
   [26.5, -13], // detrás de la tienda de Marta
   [-18, 12],
   [-4, 13],
-  [-16, -16],
 ];
