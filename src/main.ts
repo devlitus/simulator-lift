@@ -117,6 +117,9 @@ function loadGame(): boolean {
   return applySave(data, state, farmLogic, quests, animalLogic);
 }
 
+// ---------- Riego: el granjero anima la regadera sobre el surco ----------
+bus.on(EVENTS.FARM_WATERED, ({ index }) => player.playWater(farmView.tiles[index]));
+
 // ---------- Ciclo de día nuevo ----------
 bus.on(EVENTS.DAY_NEW, ({ day }) => {
   state.day = day;
@@ -220,7 +223,7 @@ engine.runRenderLoop(() => {
   const dt = Math.min(engine.getDeltaTime() / 1000, 0.1); // tope anti-saltos
   world.update(dt, state.day);
 
-  const canMove = !ui.modalOpen;
+  const canMove = !ui.modalOpen && !player.busy;
   player.update(dt, keys, canMove);
   world.updateStorageCutaway(player.position.x, player.position.z);
   npcs.update(dt);

@@ -17,6 +17,17 @@ Contenido binario del juego: modelos `.glb`, texturas y audio.
   Fuente editable: `assets/granjero_texturizado.blend`. Scripts del rig y
   las animaciones: `~/blender-mcp/granjero/` (walk.py, idle.py, exportar.py;
   enviados a Blender con `~/blender-mcp/bcmd.py`).
+  Lleva además la animación `water` (riego, ~1,3 s) y la regadera
+  emparentada al hueso `hand.R` (nodo `Regadera`, con el empty `spout_tip` en
+  la alcachofa); el juego la oculta salvo mientras riega. Ambas se añaden con
+  `assets/regadera/animar_riego.py`, que también rehace las pistas NLA y
+  reexporta el GLB.
+- `regadera.glb` — regadera low-poly de colores planos modelada por script
+  en Blender (`assets/regadera/modelar_regadera.py`, fuente
+  `assets/regadera/regadera.blend`) a partir de
+  `assets/regadera/regadera_referencia.png` (ComfyUI, Z-Image-Turbo:
+  `assets/regadera/generar_referencia_comfy.py`). El juego no la carga
+  suelta: viaja dentro de `granjero.glb`.
 - `granjero_original.glb` — copia del modelo original sin texturizar ni recortar
   la peana (respaldo).
 - `models/marta.glb` — modelo 3D de Marta (la tendera) generado con

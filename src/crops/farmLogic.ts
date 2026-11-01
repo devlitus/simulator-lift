@@ -76,6 +76,7 @@ export class FarmLogic {
     if (!c || c.withered || c.watered) return false;
     c.watered = true;
     this.bus.emit(EVENTS.FARM_CHANGED);
+    this.bus.emit(EVENTS.FARM_WATERED, { index });
     this.bus.emit(EVENTS.NOTIFY, '💧 Cultivo regado');
     return true;
   }
