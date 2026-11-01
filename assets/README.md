@@ -192,6 +192,11 @@ Contenido binario del juego: modelos `.glb`, texturas y audio.
   [`assets/almacen_interior/`](almacen_interior/README.md). Se sirve como
   `public/models/almacen_interior.glb`, con colisiones fijas y primitivas como
   respaldo.
+- `entrada_granja.glb` — arco de entrada a la granja, con tejadillo, letrero, faroles,
+  jardineras y cancela abierta. Referencia y texturas con ComfyUI (Z-Image-Turbo) y
+  modelado por script en Blender. Fuente editable `assets/entrada_granja.blend`; todo
+  lo demás en [`assets/entrada_granja/`](entrada_granja/README.md). Se sirve como
+  `public/models/entrada_granja.glb`, con colisiones fijas y primitivas como respaldo.
 - `puesto_ventas.glb` — modelo 3D del puesto de ventas del granjero generado
   con Hunyuan3D-2 (servidor local, imagen→3D con textura 2048×2048) a partir
   de `assets/puesto_ventas_referencia.png` (imagen generada con ComfyUI en

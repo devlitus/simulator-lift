@@ -1,7 +1,6 @@
 // AnimalView (vista Babylon): dibuja los animales de AnimalLogic y los pasea
-// por el recinto. Los objetivos de paseo se eligen siempre dentro del vallado
-// (con margen), así que un animal no puede salir del recinto por mucho que se
-// mueva. No decide reglas: compra, pienso y producción viven en AnimalLogic.
+// por su cercado. Los objetivos de paseo se eligen siempre dentro del vallado
+// (con margen), así que un animal no puede salir de él por mucho que se mueva. No decide reglas: compra, pienso y producción viven en AnimalLogic.
 import { CONFIG } from '../core/constants';
 import { EVENTS, EventBus } from '../core/events';
 import type { GameState } from '../core/store';
@@ -44,7 +43,7 @@ export class AnimalView {
   state: GameState;
   logic: AnimalLogic;
   defs: Record<string, AnimalDef>;
-  pen: PenConfig;
+  pens: Record<string, PenConfig>;
   visuals: Map<Animal, AnimalVisual>;
   mats: Record<string, StandardMaterial>;
   modelCache: Record<string, Promise<ISceneLoaderAsyncResult>>;
@@ -56,14 +55,14 @@ export class AnimalView {
     bus: EventBus,
     logic: AnimalLogic,
     animalsData: Record<string, AnimalDef>,
-    pen: PenConfig,
+    pens: Record<string, PenConfig>,
   ) {
     this.scene = scene;
     this.world = world;
     this.state = state;
     this.logic = logic;
     this.defs = animalsData;
-    this.pen = pen;
+    this.pens = pens;
     this.visuals = new Map();
     this.mats = {};
     this.modelCache = {};
@@ -82,10 +81,10 @@ export class AnimalView {
     return this.mats[hex];
   }
 
-  // Punto aleatorio dentro del recinto (nunca fuera: de aquí salen todos los
-  // destinos de paseo)
-  randomSpot(): { x: number; z: number } {
-    const p = this.pen;
+  // Punto aleatorio dentro del cercado de la especie (nunca fuera: de aquí salen
+  // todos los destinos de paseo)
+  randomSpot(type: string): { x: number; z: number } {
+    const p = this.pens[type];
     return {
       x: p.x1 + MARGIN + Math.random() * (p.x2 - p.x1 - 2 * MARGIN),
       z: p.z1 + MARGIN + Math.random() * (p.z2 - p.z1 - 2 * MARGIN),
@@ -93,7 +92,7 @@ export class AnimalView {
   }
 
   // Alinea los meshes con logic.animals: crea los que faltan (aparecen en un
-  // rincón aleatorio del recinto) y elimina los que sobran
+  // rincón aleatorio de su cercado) y elimina los que sobran
   syncMeshes(): void {
     const alive = new Set(this.logic.animals);
     for (const [animal, v] of this.visuals) {
@@ -110,16 +109,16 @@ export class AnimalView {
     for (const animal of this.logic.animals) {
       if (this.visuals.has(animal)) continue;
       const root = this.buildAnimal(animal.type);
-      const spot = this.randomSpot();
+      const spot = this.randomSpot(animal.type);
       root.position.set(spot.x, 0, spot.z);
-      const target = this.randomSpot();
+      const target = this.randomSpot(animal.type);
       this.visuals.set(animal, { root, tx: target.x, tz: target.z, pause: 0 });
     }
   }
 
   // Paseo: paso hacia el objetivo; al llegar, descansa un rato y elige otro
   update(dt: number): void {
-    for (const v of this.visuals.values()) {
+    for (const [animal, v] of this.visuals) {
       if (v.pause > 0) {
         v.pause -= dt;
         this._animar(v, false);
@@ -129,7 +128,7 @@ export class AnimalView {
       const dz = v.tz - v.root.position.z;
       const dist = Math.hypot(dx, dz);
       if (dist < 0.1) {
-        const target = this.randomSpot();
+        const target = this.randomSpot(animal.type);
         v.tx = target.x;
         v.tz = target.z;
         v.pause = 0.5 + Math.random() * 2.5;

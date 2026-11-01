@@ -1,7 +1,7 @@
 // AnimalLogic (dominio puro, SIN Babylon): reglas de los animales de granja.
 // Compra en tienda, alimentación con pienso y producción diaria sobre datos
 // planos. No crea meshes ni mueve nada: la vista (src/animals/animalView.ts)
-// refleja este estado y pasea a los animales dentro del recinto.
+// refleja este estado y pasea a cada animal dentro de su cercado.
 import { EVENTS, EventBus } from '../core/events';
 import type { AnimalDef } from '../../data/schemas';
 

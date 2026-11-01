@@ -9,6 +9,7 @@ import { DirectionalLight } from '@babylonjs/core/Lights/directionalLight';
 import { HemisphericLight } from '@babylonjs/core/Lights/hemisphericLight';
 import { SceneLoader } from '@babylonjs/core/Loading/sceneLoader';
 import { PBRMaterial } from '@babylonjs/core/Materials/PBR/pbrMaterial';
+import { DynamicTexture } from '@babylonjs/core/Materials/Textures/dynamicTexture';
 import { StandardMaterial } from '@babylonjs/core/Materials/standardMaterial';
 import { Texture } from '@babylonjs/core/Materials/Textures/texture';
 import { Color3, Color4 } from '@babylonjs/core/Maths/math.color';
@@ -21,6 +22,16 @@ import { PhysicsImpostor } from '@babylonjs/core/Physics/v1/physicsImpostor';
 import { Scene } from '@babylonjs/core/scene';
 import type { ISceneLoaderAsyncResult, Node } from '@babylonjs/core';
 import { FARMER_HOUSE, PORCH_BARRIERS } from './farmerPorch';
+import {
+  ENTRANCE_PATH,
+  FARM_ENTRANCE,
+  FARM_ENTRANCE_SOLIDS,
+  FARM_FENCE,
+  SALES_POINT,
+  SALES_STAND,
+  STREET_END_Z,
+  WELL,
+} from './farmLayout';
 import { STORAGE, STORAGE_WALLS } from './warehouse';
 import { WellView } from './wellView';
 
@@ -34,15 +45,15 @@ interface PathTile {
 
 // Árboles del pueblo; SceneryView no siembra decoración encima de ellos.
 export const TREE_SPOTS: number[][] = [
-  [8, 11],
+  [-6, 5],
   [-10, 9],
-  [20, 3],
+  [-13, 6],
   [-20, 3],
   [7, -11],
   [-7, -14],
   [21, -12],
   [-18, 12],
-  [14, 14],
+  [-4, 13],
   [-16, -16],
 ];
 
@@ -54,23 +65,23 @@ export class WorldView {
   sun: DirectionalLight;
   shadow: ShadowGenerator | null;
   ground!: Mesh; // superficie física; SceneryView la oculta al cargar las colinas
-  pen: PenConfig;
+  pens: Record<string, PenConfig>;
   sellBin: { x: number; z: number };
   well: { x: number; z: number };
   wellCrank: { x: number; z: number }; // donde se pone el granjero para girar la manivela
   wellView: WellView | null = null; // animación del cubo (si carga el GLB)
-  private homeWindows: PBRMaterial | null = null; // cristales: se encienden de noche
+  private nightGlow: { mat: PBRMaterial; r: number; g: number; b: number }[] = []; // de noche
   indoors = false; // el granjero está en un interior: su casa o el almacén
   daylight = 1; // luz diurna fuera: 0 de noche, 1 al mediodía
 
   constructor(
     scene: Scene,
     bus: EventBus,
-    { shadows = true, pen }: { shadows?: boolean; pen: PenConfig },
+    { shadows = true, pens }: { shadows?: boolean; pens: Record<string, PenConfig> },
   ) {
     this.scene = scene;
     this.bus = bus;
-    this.pen = pen;
+    this.pens = pens;
     this.time = 0.08; // fracción del día transcurrida (0 = 06:00). Empieza ~08:00.
 
     scene.clearColor = new Color4(0.55, 0.78, 0.95, 1);
@@ -95,11 +106,10 @@ export class WorldView {
       this.shadow.usePercentageCloserFiltering = true;
     }
 
-    // Punto de venta: delante del mostrador del puesto, junto al lado sur del
-    // almacén y mirando a las parcelas (main.ts lo usa como interactuable).
-    // La puerta del almacén ya no es interactuable: la sustituye el puesto.
-    this.sellBin = { x: 11.6, z: 8 };
-    this.well = { x: 3.7, z: 10.3 }; // junto a la parcela, al sur
+    // Punto de venta: delante del mostrador del puesto (main.ts lo usa como
+    // interactuable).
+    this.sellBin = SALES_POINT;
+    this.well = WELL;
     // La manivela sale por el lado -x del pozo (a la derecha en pantalla):
     // pozo.glb la tiene en +x de Blender y la conversión de ejes la refleja.
     this.wellCrank = { x: this.well.x - 1.35, z: this.well.z };
@@ -110,7 +120,9 @@ export class WorldView {
     this.buildBuildings();
     this.buildTrees();
     this.buildDecor();
-    this.buildPen();
+    this.buildPens();
+    this.buildFarmFence();
+    this.buildFarmEntrance();
   }
 
   addShadow(mesh: AbstractMesh): void {
@@ -173,14 +185,27 @@ export class WorldView {
   // Tierra entre las baldosas; el terreno sigue siendo la superficie física.
   buildPaths(): void {
     const sand = this.mat(0.78, 0.7, 0.52);
-    const p1 = MeshBuilder.CreateBox('path1', { width: 2.2, height: 0.04, depth: 40 }, this.scene);
-    p1.position.set(0, 0.02, -8);
+    const p1 = MeshBuilder.CreateBox(
+      'path1',
+      { width: 2.2, height: 0.04, depth: STREET_END_Z + 28 },
+      this.scene,
+    );
+    p1.position.set(0, 0.02, (STREET_END_Z - 28) / 2);
     p1.material = sand;
     p1.receiveShadows = true;
     const p2 = MeshBuilder.CreateBox('path2', { width: 30, height: 0.04, depth: 2.2 }, this.scene);
     p2.position.set(-1, 0.02, -4);
     p2.material = sand;
     p2.receiveShadows = true;
+    const { minX, maxX, minZ, maxZ } = ENTRANCE_PATH;
+    const p3 = MeshBuilder.CreateBox(
+      'path3',
+      { width: maxX - minX, height: 0.04, depth: maxZ - minZ },
+      this.scene,
+    );
+    p3.position.set((minX + maxX) / 2, 0.02, (minZ + maxZ) / 2);
+    p3.material = sand;
+    p3.receiveShadows = true;
 
     // Una rejilla compartida une ambas franjas sin solapar piedras en el
     // cruce. Las piezas de los extremos se recortan a los límites del camino.
@@ -188,8 +213,9 @@ export class WorldView {
     const zOrigin = -5.1;
     const tiles = new Map<string, PathTile>();
     const paths = [
-      { minX: -1.1, maxX: 1.1, minZ: -28, maxZ: 12 },
+      { minX: -1.1, maxX: 1.1, minZ: -28, maxZ: STREET_END_Z },
       { minX: -16, maxX: 14, minZ: -5.1, maxZ: -2.9 },
+      ENTRANCE_PATH,
     ];
     for (const path of paths) {
       const minCol = Math.floor(path.minX / step);
@@ -387,9 +413,9 @@ export class WorldView {
     this.buildMartaShop();
     this.buildGonHouse();
     this.buildLilaHouse();
-    this.buildFarmerHouse(); // Casa del granjero, al sur del recinto
-    this.buildStorage(); // Almacén del granjero, al este de la parcela
-    this.buildSalesStand(); // Puesto de ventas, junto al almacén y frente a la parcela
+    this.buildFarmerHouse(); // Casa del granjero, al sur del almacén
+    this.buildStorage(); // Almacén del granjero, al sur de la parcela
+    this.buildSalesStand(); // Puesto de ventas, en la esquina suroeste de la granja
   }
 
   // Casa de Lila: GLB texturizado con la misma colisión y el fallback verde
@@ -561,14 +587,13 @@ export class WorldView {
   }
 
   // Almacén del granjero: modelo GLB (assets/almacen.glb, publicado en
-  // /models/) con fallback a primitivas si falla la carga. Va al este de la
-  // parcela, separado de los surcos, con la puerta mirando a la parcela
-  // (oeste, -x). Ya no es interactuable: la venta pasa por el puesto de
-  // ventas (buildSalesStand), que queda justo al este del almacén.
+  // /models/) con fallback a primitivas si falla la carga. Va bajo la zona de
+  // cosecha, con la puerta mirando al oeste (-x).
   // La colisión son cuatro paredes macizas: se entra con Intro frente a la
   // puerta, que lleva al interior (ver warehouse.ts).
   buildStorage(): void {
     const { x, z } = STORAGE; // centro del almacén
+    const k = STORAGE.height / 2.2; // las primitivas se midieron para 2,2 m de alto
 
     // Paredes: colisión fija (independiente del modelo) y, a la vez,
     // primitivas de respaldo visibles hasta que carga el GLB.
@@ -577,10 +602,10 @@ export class WorldView {
     for (const { w, d, px, pz } of STORAGE_WALLS) {
       const wall = MeshBuilder.CreateBox(
         'storageWall',
-        { width: w, height: 1.6, depth: d },
+        { width: w, height: 1.6 * k, depth: d },
         this.scene,
       );
-      wall.position.set(px, 0.8, pz);
+      wall.position.set(px, 0.8 * k, pz);
       wall.material = wallMat;
       wall.receiveShadows = true;
       wall.physicsImpostor = new PhysicsImpostor(
@@ -593,8 +618,7 @@ export class WorldView {
       wallMeshes.push(wall);
     }
 
-    // Nodo raíz: posición y giro para que la puerta mire a la parcela
-    // (oeste, -x): la puerta del GLB mira hacia +z, como las casas; -π/2 en
+    // Nodo raíz: posición y giro para que la puerta mire al oeste (-x): la puerta del GLB mira hacia +z, como las casas; -π/2 en
     // Y la deja en -x.
     const root = new TransformNode('storageRoot', this.scene);
     root.position.set(x, 0, z);
@@ -607,11 +631,11 @@ export class WorldView {
     for (const side of [-1, 1]) {
       const slope = MeshBuilder.CreateBox(
         'storageRoof',
-        { width: 2.7, height: 0.08, depth: 1.05 },
+        { width: 2.7 * k, height: 0.08, depth: 1.05 * k },
         this.scene,
       );
       slope.parent = root;
-      slope.position.set(0, 2.0, side * 0.5);
+      slope.position.set(0, 2.0 * k, side * 0.5 * k);
       slope.rotation.x = side * 0.72;
       slope.material = roofMat;
       this.addShadow(slope);
@@ -630,7 +654,7 @@ export class WorldView {
       const res = await SceneLoader.ImportMeshAsync('', '/models/', 'almacen.glb', this.scene);
       const model = res.meshes[0];
       const { min, max } = model.getHierarchyBoundingVectors(true);
-      const escala = 2.2 / (max.y - min.y);
+      const escala = STORAGE.height / (max.y - min.y);
       model.parent = root;
       model.scaling = new Vector3(escala, escala, escala);
       model.position.y = -min.y * escala;
@@ -654,26 +678,24 @@ export class WorldView {
   }
 
   // Puesto de ventas: modelo GLB (assets/puesto_ventas.glb, publicado en
-  // /models/) con fallback a primitivas si falla la carga. Va junto al lado
-  // sur del almacén, con el mostrador mirando al oeste (-x), hacia las
-  // parcelas. El GLB mide ~1.96×1.94×1.21 (la vista lo escala a ~1.9 de
+  // /models/) con fallback a primitivas si falla la carga. Va en la esquina
+  // suroeste de la granja, con el mostrador mirando al este (+x), hacia el
+  // interior. El GLB mide ~1.96×1.94×1.21 (la vista lo escala a ~1.9 de
   // alto): es ancho y poco profundo, con el mostrador en su cara frontal.
-  // La rotación -π/2 en Y lleva la fachada local +z hacia el oeste. Sustituye
-  // a la puerta del almacén como punto de venta: sellBin queda delante del
-  // mostrador (main.ts no cambia).
+  // La rotación π/2 en Y lleva la fachada local +z hacia el este; sellBin
+  // queda delante del mostrador.
   buildSalesStand(): void {
-    const x = 13.5;
-    const z = 8;
+    const { x, z } = SALES_STAND;
 
     // Colisión fija (independiente del modelo): caja invisible que cubre el
     // volumen del puesto (~1.2×1.9×1.9 tras el giro). El mostrador queda en
-    // la cara oeste y el cuerpo se extiende hacia el este, junto al almacén.
+    // la cara este y el cuerpo se extiende hacia el oeste.
     const hit = MeshBuilder.CreateBox(
       'salesStandHit',
       { width: 1.4, height: 2.0, depth: 2.0 },
       this.scene,
     );
-    hit.position.set(x - 0.6, 1.0, z);
+    hit.position.set(x + 0.6, 1.0, z);
     hit.isVisible = false;
     hit.physicsImpostor = new PhysicsImpostor(
       hit,
@@ -682,13 +704,13 @@ export class WorldView {
       this.scene,
     );
 
-    // El frente local +z del GLB rota al oeste, hacia las parcelas.
+    // El frente local +z del GLB rota al este, hacia el interior de la granja.
     const root = new TransformNode('salesStandRoot', this.scene);
     root.position.set(x, 0, z);
-    root.rotation.y = -Math.PI / 2;
+    root.rotation.y = Math.PI / 2;
 
     // Primitivas de respaldo, con el estilo del resto del pueblo. El
-    // mostrador local +z hereda el giro del root y también mira a la parcela.
+    // mostrador local +z hereda el giro del root.
     const prims: Mesh[] = [];
     const counter = MeshBuilder.CreateBox(
       'salesStandCounter',
@@ -824,10 +846,10 @@ export class WorldView {
   buildFarmerHouse(): void {
     const { x, z, width, depth, height } = FARMER_HOUSE;
     const colliders = [
-      // Cuerpo, con la chimenea al oeste y la leña al este
-      { w: width + 1.4, h: height, d: depth, cx: x, cz: z },
+      // Cuerpo, con la chimenea y la leña a los lados de la fachada
+      { w: depth, h: height, d: width + 1.4, cx: x, cz: z },
       ...PORCH_BARRIERS.map((b) => ({ ...b, h: 1 })),
-      { w: 0.7, h: 0.8, d: 0.7, cx: x - 2, cz: z + depth / 2 + 0.75 }, // barril
+      { w: 0.7, h: 0.8, d: 0.7, cx: x - depth / 2 - 0.75, cz: z - 2 }, // barril
     ];
     for (const c of colliders) {
       const hit = MeshBuilder.CreateBox(
@@ -845,8 +867,10 @@ export class WorldView {
       );
     }
 
+    // La fachada del GLB mira a +z; -π/2 en Y la deja mirando a -x, hacia la entrada
     const root = new TransformNode('farmerHouseRoot', this.scene);
     root.position.set(x, 0, z);
+    root.rotation.y = -Math.PI / 2;
     const base = MeshBuilder.CreateBox(
       'farmerHouseBase',
       { width, height: 2.6, depth },
@@ -901,7 +925,7 @@ export class WorldView {
           this.addShadow(mesh);
         }
         if (mesh.material instanceof PBRMaterial && mesh.material.name === 'M_Cristal') {
-          this.homeWindows = mesh.material;
+          this.nightGlow.push({ mat: mesh.material, r: 1, g: 0.72, b: 0.35 });
         }
       }
       for (const prim of prims) {
@@ -1017,9 +1041,6 @@ export class WorldView {
   buildDecor(): void {
     this.buildWell();
 
-    // La antigua caja de ventas ya no existe: la sustituye el almacén del
-    // granjero (buildStorage), que ocupa su lugar al este de la parcela.
-
     // Jardín de flores de Lila: los modelos se cargan de forma independiente
     // para que un GLB defectuoso no deje el jardín vacío.
     const spots = [
@@ -1106,31 +1127,136 @@ export class WorldView {
     }
   }
 
-  // Recinto de animales al oeste de la calle, frente a la parcela: suelo de
-  // paja y valla de madera con puerta hacia la calle. Las coordenadas vienen
-  // de data/animals.ts (PEN): los animales (animalView) pasean dentro del
-  // mismo rectángulo. Los animales ya no son decoración: los gestiona
-  // AnimalLogic/AnimalView.
-  buildPen(): void {
-    const { x1, x2, z1, z2, gateZ1, gateZ2 } = this.pen;
+  // Un cercado por especie: suelo de paja y valla de madera con puerta al sur.
+  // Las coordenadas vienen de data/animals.ts (PENS): cada animal (animalView)
+  // pasea dentro del suyo. Los animales los gestiona AnimalLogic/AnimalView.
+  buildPens(): void {
+    const pens = Object.values(this.pens);
+    const floorMat = this.mat(0.82, 0.72, 0.45);
+    const fenceMat = this.mat(0.5, 0.36, 0.2);
+    for (const { x1, x2, z1, z2, gateX1, gateX2 } of pens) {
+      const floor = MeshBuilder.CreateBox(
+        'penFloor',
+        { width: x2 - x1, height: 0.04, depth: z2 - z1 },
+        this.scene,
+      );
+      floor.position.set((x1 + x2) / 2, 0.02, (z1 + z2) / 2);
+      floor.material = floorMat;
+      floor.receiveShadows = true;
 
-    // Suelo de paja
-    const floor = MeshBuilder.CreateBox(
-      'penFloor',
-      { width: x2 - x1, height: 0.04, depth: z2 - z1 },
+      this.fenceSide(x1, z1, x2, z1, fenceMat); // norte
+      this.fenceSide(x1, z2, gateX1, z2, fenceMat); // sur, a un lado de la puerta
+      this.fenceSide(gateX2, z2, x2, z2, fenceMat); // sur, al otro
+      this.fenceSide(x1, z1, x1, z2, fenceMat); // oeste
+      // El lado este solo si no lo pone ya el cercado vecino como su oeste
+      if (!pens.some((p) => p.x1 === x2)) this.fenceSide(x2, z1, x2, z2, fenceMat);
+    }
+  }
+
+  // Valla de la granja, con su único hueco en el lado de la calle (ver farmLayout).
+  buildFarmFence(): void {
+    const fenceMat = this.mat(0.5, 0.36, 0.2);
+    for (const [x1, z1, x2, z2] of FARM_FENCE) this.fenceSide(x1, z1, x2, z2, fenceMat);
+  }
+
+  // Arco de entrada: modelo GLB (assets/entrada_granja/, publicado en /models/) con
+  // colisiones fijas, primitivas de respaldo y el nombre pintado en su letrero.
+  buildFarmEntrance(): void {
+    const { x, z, z1, z2, signY } = FARM_ENTRANCE;
+    for (const c of FARM_ENTRANCE_SOLIDS) {
+      const hit = MeshBuilder.CreateBox(
+        'farmEntranceHit',
+        { width: c.w, height: 1.5, depth: c.d },
+        this.scene,
+      );
+      hit.position.set(c.cx, 0.75, c.cz);
+      hit.isVisible = false;
+      hit.physicsImpostor = new PhysicsImpostor(
+        hit,
+        PhysicsImpostor.BoxImpostor,
+        { mass: 0 },
+        this.scene,
+      );
+    }
+
+    // El exterior del GLB mira a -Y de Blender; -π/2 en Y lo deja hacia la calle (-x)
+    const root = new TransformNode('farmEntranceRoot', this.scene);
+    root.position.set(x, 0, z);
+    root.rotation.y = -Math.PI / 2;
+
+    const wood = this.mat(0.45, 0.3, 0.18);
+    const prims: Mesh[] = [];
+    const box = (w: number, h: number, d: number, px: number, py: number, pz: number) => {
+      const b = MeshBuilder.CreateBox(
+        'farmEntrancePrim',
+        { width: w, height: h, depth: d },
+        this.scene,
+      );
+      b.position.set(px, py, pz);
+      b.material = wood;
+      this.addShadow(b);
+      prims.push(b);
+    };
+    box(0.4, 3.3, 0.4, x, 1.65, z1);
+    box(0.4, 3.3, 0.4, x, 1.65, z2);
+    box(0.3, 0.3, z2 - z1 + 0.9, x, 3.2, z);
+    box(0.06, 1.2, 0.06, x, 3.8, z); // soporte del letrero
+
+    // Letrero, sobre la cumbrera: de cara a la cámara, que mira hacia -z
+    const tex = new DynamicTexture(
+      'granjaLetreroTex',
+      { width: 512, height: 184 },
+      this.scene,
+      true,
+    );
+    const ctx = tex.getContext() as CanvasRenderingContext2D;
+    ctx.fillStyle = '#b5834f';
+    ctx.fillRect(0, 0, 512, 184);
+    ctx.fillStyle = '#3a2614';
+    ctx.font = 'bold 96px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('🌾 Granja', 256, 98);
+    tex.update();
+    const signMat = new StandardMaterial('granjaLetreroMat', this.scene);
+    signMat.diffuseTexture = tex;
+    signMat.specularColor = Color3.Black();
+    const sign = MeshBuilder.CreatePlane(
+      'granjaLetrero',
+      { width: 1.34, height: 0.48 },
       this.scene,
     );
-    floor.position.set((x1 + x2) / 2, 0.02, (z1 + z2) / 2);
-    floor.material = this.mat(0.82, 0.72, 0.45);
-    floor.receiveShadows = true;
+    sign.position.set(x, signY, z + 0.055);
+    sign.rotation.y = Math.PI;
+    sign.material = signMat;
 
-    // Valla perimetral con puerta en el lado este (mirando a la calle)
-    const fenceMat = this.mat(0.5, 0.36, 0.2);
-    this.fenceSide(x1, z1, x2, z1, fenceMat); // norte
-    this.fenceSide(x1, z2, x2, z2, fenceMat); // sur
-    this.fenceSide(x1, z1, x1, z2, fenceMat); // oeste
-    this.fenceSide(x2, z1, x2, gateZ1, fenceMat); // este, tramo inferior
-    this.fenceSide(x2, gateZ2, x2, z2, fenceMat); // este, tramo superior (puerta entre ambos)
+    void this._loadFarmEntrance(root, prims);
+  }
+
+  private async _loadFarmEntrance(root: TransformNode, prims: Mesh[]): Promise<void> {
+    try {
+      const res = await SceneLoader.ImportMeshAsync(
+        '',
+        '/models/',
+        'entrada_granja.glb',
+        this.scene,
+      );
+      res.meshes[0].parent = root; // medidas métricas: las colisiones se apoyan en ellas
+      for (const m of res.meshes) {
+        if (m.getTotalVertices() === 0) continue;
+        m.receiveShadows = true;
+        this.addShadow(m);
+        if (m.material instanceof PBRMaterial && m.material.name === 'M_Farol') {
+          this.nightGlow.push({ mat: m.material, r: 1, g: 0.72, b: 0.35 });
+        }
+      }
+      for (const p of prims) {
+        this.shadow?.removeShadowCaster(p);
+        p.dispose();
+      }
+    } catch {
+      // fallback: se quedan los postes y la viga de primitivas
+    }
   }
 
   // Un lado de valla: postes cada ~1.9 unidades, dos travesaños
@@ -1229,10 +1355,10 @@ export class WorldView {
     const sky = this.scene.clearColor;
     this.scene.fogColor.copyFromFloats(sky.r, sky.g, sky.b);
 
-    // Luz cálida en las ventanas de casa al anochecer
-    if (this.homeWindows) {
-      const noche = 1 - Math.min(1, f * 3);
-      this.homeWindows.emissiveColor.copyFromFloats(1 * noche, 0.72 * noche, 0.35 * noche);
+    // Luz cálida en las ventanas de casa y en los faroles de la entrada al anochecer
+    const noche = 1 - Math.min(1, f * 3);
+    for (const { mat, r, g, b } of this.nightGlow) {
+      mat.emissiveColor.copyFromFloats(r * noche, g * noche, b * noche);
     }
 
     this.daylight = f;
