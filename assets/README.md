@@ -184,6 +184,14 @@ Contenido binario del juego: modelos `.glb`, texturas y audio.
   [`assets/casa_interior/`](casa_interior/README.md). Se sirve como
   `public/models/casa_interior.glb`, con colisiones fijas y estancia de
   primitivas como respaldo.
+- `almacen_interior.glb` — interior del almacén, un escenario propio al que se
+  entra por su puerta principal: diorama de 16 × 12 m en dos niveles, con una
+  estantería por recurso, un box de pienso por animal y un altillo con escalera
+  de mano. Referencia y texturas con ComfyUI (Z-Image-Turbo) y modelado por script
+  en Blender. Fuente editable `assets/almacen_interior.blend`; todo lo demás en
+  [`assets/almacen_interior/`](almacen_interior/README.md). Se sirve como
+  `public/models/almacen_interior.glb`, con colisiones fijas y primitivas como
+  respaldo.
 - `puesto_ventas.glb` — modelo 3D del puesto de ventas del granjero generado
   con Hunyuan3D-2 (servidor local, imagen→3D con textura 2048×2048) a partir
   de `assets/puesto_ventas_referencia.png` (imagen generada con ComfyUI en

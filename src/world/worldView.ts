@@ -12,7 +12,6 @@ import { PBRMaterial } from '@babylonjs/core/Materials/PBR/pbrMaterial';
 import { StandardMaterial } from '@babylonjs/core/Materials/standardMaterial';
 import { Texture } from '@babylonjs/core/Materials/Textures/texture';
 import { Color3, Color4 } from '@babylonjs/core/Maths/math.color';
-import { Plane } from '@babylonjs/core/Maths/math.plane';
 import { Vector3 } from '@babylonjs/core/Maths/math.vector';
 import { AbstractMesh } from '@babylonjs/core/Meshes/abstractMesh';
 import { Mesh } from '@babylonjs/core/Meshes/mesh';
@@ -22,6 +21,7 @@ import { PhysicsImpostor } from '@babylonjs/core/Physics/v1/physicsImpostor';
 import { Scene } from '@babylonjs/core/scene';
 import type { ISceneLoaderAsyncResult, Node } from '@babylonjs/core';
 import { FARMER_HOUSE, PORCH_BARRIERS } from './farmerPorch';
+import { STORAGE, STORAGE_WALLS } from './warehouse';
 import { WellView } from './wellView';
 
 interface PathTile {
@@ -32,17 +32,6 @@ interface PathTile {
   variant: number;
 }
 
-// Planta del almacén (centrada en el GLB, que mide ~2.06×2.2 tras el
-// escalado de la vista) y hueco de la puerta en la pared oeste.
-const STORAGE = {
-  x: 12.47,
-  z: 5,
-  width: 2.06,
-  depth: 2.2,
-  wallThickness: 0.2,
-  doorWidth: 1.1,
-  doorwayMargin: 0.4, // el corte se activa ya en el umbral de la puerta
-};
 // Árboles del pueblo; SceneryView no siembra decoración encima de ellos.
 export const TREE_SPOTS: number[][] = [
   [8, 11],
@@ -57,9 +46,6 @@ export const TREE_SPOTS: number[][] = [
   [-16, -16],
 ];
 
-// Recorta lo que queda por encima de 1.3 m (Babylon descarta y - 1.3 > 0)
-const STORAGE_CUT_PLANE = new Plane(0, 1, 0, -1.3);
-
 export class WorldView {
   scene: Scene;
   bus: EventBus;
@@ -73,9 +59,8 @@ export class WorldView {
   well: { x: number; z: number };
   wellCrank: { x: number; z: number }; // donde se pone el granjero para girar la manivela
   wellView: WellView | null = null; // animación del cubo (si carga el GLB)
-  storageCut = false; // el granjero está dentro del almacén
   private homeWindows: PBRMaterial | null = null; // cristales: se encienden de noche
-  indoors = false; // el granjero está en el interior de su casa (ver homeInterior)
+  indoors = false; // el granjero está en un interior: su casa o el almacén
   daylight = 1; // luz diurna fuera: 0 de noche, 1 al mediodía
 
   constructor(
@@ -580,28 +565,16 @@ export class WorldView {
   // parcela, separado de los surcos, con la puerta mirando a la parcela
   // (oeste, -x). Ya no es interactuable: la venta pasa por el puesto de
   // ventas (buildSalesStand), que queda justo al este del almacén.
-  // El GLB es hueco: la colisión son cuatro paredes con un hueco en la
-  // puerta, así que solo se entra y se sale por ella.
+  // La colisión son cuatro paredes macizas: se entra con Intro frente a la
+  // puerta, que lleva al interior (ver warehouse.ts).
   buildStorage(): void {
     const { x, z } = STORAGE; // centro del almacén
-    const halfW = STORAGE.width / 2; // eje x (fachada de la puerta al oeste)
-    const halfD = STORAGE.depth / 2; // eje z
-    const t = STORAGE.wallThickness;
-    const halfDoor = STORAGE.doorWidth / 2;
-    const sideLen = halfD - halfDoor; // cada tramo de la pared de la puerta
 
     // Paredes: colisión fija (independiente del modelo) y, a la vez,
     // primitivas de respaldo visibles hasta que carga el GLB.
     const wallMat = this.mat(0.55, 0.38, 0.22);
-    const walls: { w: number; d: number; px: number; pz: number }[] = [
-      { w: t, d: STORAGE.depth, px: x + halfW - t / 2, pz: z }, // este
-      { w: STORAGE.width, d: t, px: x, pz: z - halfD + t / 2 }, // norte
-      { w: STORAGE.width, d: t, px: x, pz: z + halfD - t / 2 }, // sur
-      { w: t, d: sideLen, px: x - halfW + t / 2, pz: z - halfD + sideLen / 2 }, // oeste, norte
-      { w: t, d: sideLen, px: x - halfW + t / 2, pz: z + halfD - sideLen / 2 }, // oeste, sur
-    ];
     const wallMeshes: Mesh[] = [];
-    for (const { w, d, px, pz } of walls) {
+    for (const { w, d, px, pz } of STORAGE_WALLS) {
       const wall = MeshBuilder.CreateBox(
         'storageWall',
         { width: w, height: 1.6, depth: d },
@@ -617,7 +590,6 @@ export class WorldView {
         this.scene,
       );
       this.addShadow(wall);
-      this._clipWithStorageCut(wall);
       wallMeshes.push(wall);
     }
 
@@ -643,7 +615,6 @@ export class WorldView {
       slope.rotation.x = side * 0.72;
       slope.material = roofMat;
       this.addShadow(slope);
-      this._clipWithStorageCut(slope);
       prims.push(slope);
     }
 
@@ -668,10 +639,7 @@ export class WorldView {
       root.position.x += STORAGE.x - (placed.min.x + placed.max.x) / 2;
       root.position.z += STORAGE.z - (placed.min.z + placed.max.z) / 2;
       for (const m of res.meshes) {
-        if (m.getTotalVertices() > 0) {
-          this.addShadow(m);
-          this._clipWithStorageCut(m);
-        }
+        if (m.getTotalVertices() > 0) this.addShadow(m);
       }
       for (const p of prims) p.dispose();
       // Las paredes siguen colisionando, pero ya no se ven ni dan sombra
@@ -683,30 +651,6 @@ export class WorldView {
     } catch {
       // fallback: se quedan las primitivas
     }
-  }
-
-  // Corte del almacén: mientras el granjero está dentro (o en el umbral),
-  // el almacén se dibuja recortado a media altura para que se le vea con
-  // la cámara isométrica. El plano de recorte es de escena, así que se
-  // activa solo durante el dibujado de las mallas del almacén.
-  private _clipWithStorageCut(mesh: AbstractMesh): void {
-    if (!(mesh instanceof Mesh)) return; // las instancias no tienen eventos propios
-    mesh.onBeforeRenderObservable.add(() => {
-      if (this.storageCut) this.scene.clipPlane = STORAGE_CUT_PLANE;
-    });
-    mesh.onAfterRenderObservable.add(() => {
-      this.scene.clipPlane = null;
-    });
-  }
-
-  // Lo llama main.ts cada frame con la posición del jugador.
-  updateStorageCutaway(px: number, pz: number): void {
-    const margin = STORAGE.doorwayMargin;
-    this.storageCut =
-      px > STORAGE.x - STORAGE.width / 2 - margin &&
-      px < STORAGE.x + STORAGE.width / 2 &&
-      pz > STORAGE.z - STORAGE.depth / 2 &&
-      pz < STORAGE.z + STORAGE.depth / 2;
   }
 
   // Puesto de ventas: modelo GLB (assets/puesto_ventas.glb, publicado en
@@ -1292,7 +1236,7 @@ export class WorldView {
     }
 
     this.daylight = f;
-    // Dentro de casa manda la luz de la estancia, sea la hora que sea, y detrás
+    // En un interior manda la luz de la estancia, sea la hora que sea, y detrás
     // del diorama no hay paisaje.
     if (this.indoors) {
       this.sun.intensity = 0.45;
