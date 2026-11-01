@@ -17,6 +17,12 @@ function chocaBarrera(x: number, z: number): boolean {
 }
 
 describe('porche de la casa del granjero', () => {
+  it('solo se entra frente a la puerta, no desde detrás de la casa', () => {
+    expect(canEnterDoor(DOOR_SPOT.x, DOOR_SPOT.z)).toBe(true);
+    expect(canEnterDoor(H.x, H.z - H.depth / 2 - 1)).toBe(false);
+    expect(canEnterDoor(H.x, H.z - 12)).toBe(false);
+  });
+
   it('se sube por dos peldaños hasta la tarima', () => {
     expect(floorHeightAt(H.x, PORCH.stepFrontZ + 0.1)).toBe(0);
     expect(floorHeightAt(H.x, PORCH.stepFrontZ - 0.1)).toBe(PORCH.stepHeight);

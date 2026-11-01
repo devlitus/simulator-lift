@@ -100,14 +100,15 @@ export const FeedSchema = z.object({
 });
 export type FeedDef = z.infer<typeof FeedSchema>;
 
-// Rectángulo del recinto de animales: la valla (worldView) y el paseo de los
+// Rectángulo del cercado de una especie: la valla (worldView) y el paseo de los
 // animales (animalView) leen las mismas coordenadas para que nunca diverjan.
 export const PenConfigSchema = z.object({
   x1: z.number(),
   x2: z.number(),
   z1: z.number(),
   z2: z.number(),
-  gateZ1: z.number(), // hueco de la puerta en el lado este (entre gateZ1 y gateZ2)
-  gateZ2: z.number(),
+  gateX1: z.number(), // hueco de la puerta en el lado sur (entre gateX1 y gateX2)
+  gateX2: z.number(),
 });
 export type PenConfig = z.infer<typeof PenConfigSchema>;
+export const PensSchema = z.record(z.string(), PenConfigSchema);

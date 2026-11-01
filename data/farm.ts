@@ -5,7 +5,7 @@ export const FARM_CONFIG: FarmConfig = FarmConfigSchema.parse({
   cols: 6,
   rows: 4,
   spacing: 1.5, // distancia entre surcos
-  origin: { x: 2.5, z: 3 }, // esquina de la parcela, al este de la calle (x ∈ [-1.1, 1.1])
+  origin: { x: 19.55, z: -0.4 }, // esquina de la parcela, centrada en la zona de cosecha
   tileSize: 1.3,
 });
 

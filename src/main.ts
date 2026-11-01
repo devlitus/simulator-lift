@@ -27,7 +27,7 @@ import type { Interaction } from './core/types';
 import { BALANCE } from '../data/balance';
 import { CROPS } from '../data/crops';
 import { FARM_CONFIG, WATERING_CAN_CAPACITY } from '../data/farm';
-import { ANIMALS, ANIMAL_FEED, PEN } from '../data/animals';
+import { ANIMALS, ANIMAL_FEED, PENS } from '../data/animals';
 import { GIFTS } from '../data/gifts';
 import { NPC_DEFS } from '../data/npcs';
 import { QUEST_DEFS } from '../data/quests';
@@ -105,8 +105,8 @@ const friendship = new Friendship(state, bus, NPC_DEFS);
 const quests = new QuestSystem(state, bus, QUEST_DEFS);
 
 // ---------- Vistas Babylon + UI ----------
-const world = new WorldView(scene, bus, { shadows: !lowSpec, pen: PEN });
-new SceneryView(scene, world, PEN, TREE_SPOTS);
+const world = new WorldView(scene, bus, { shadows: !lowSpec, pens: PENS });
+new SceneryView(scene, world, TREE_SPOTS);
 const homeInterior = new HomeInteriorView(scene);
 const warehouse = new WarehouseView(
   scene,
@@ -126,7 +126,7 @@ const warehouse = new WarehouseView(
 );
 const player = new PlayerView(scene, world);
 const farmView = new FarmView(scene, state, bus, farmLogic, FARM_CONFIG, CROPS);
-const animalView = new AnimalView(scene, world, state, bus, animalLogic, ANIMALS, PEN);
+const animalView = new AnimalView(scene, world, state, bus, animalLogic, ANIMALS, PENS);
 const ui = new GameUI(
   bus,
   state,

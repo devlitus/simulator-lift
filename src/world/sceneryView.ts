@@ -4,7 +4,8 @@
 // de dibujo por malla aunque haya cientos de copias. Las colinas del
 // horizonte rodean el mapa para que no termine en el vacío.
 import { CONFIG } from '../core/constants';
-import type { PenConfig } from '../../data/schemas';
+import { PENS } from '../../data/animals';
+import { FARM_CONFIG } from '../../data/farm';
 import { Ray } from '@babylonjs/core/Culling/ray';
 import { SceneLoader } from '@babylonjs/core/Loading/sceneLoader';
 import { PBRMaterial } from '@babylonjs/core/Materials/PBR/pbrMaterial';
@@ -15,14 +16,10 @@ import { Mesh } from '@babylonjs/core/Meshes/mesh';
 import { MeshBuilder } from '@babylonjs/core/Meshes/meshBuilder';
 import { PhysicsImpostor } from '@babylonjs/core/Physics/v1/physicsImpostor';
 import type { AbstractMesh, Material, Scene } from '@babylonjs/core';
+import { FARMER_HOUSE, PORCH } from './farmerPorch';
+import { FARM_ZONE, SALES_STAND, WELL, type Rect } from './farmLayout';
+import { STORAGE } from './warehouse';
 import type { WorldView } from './worldView';
-
-interface Rect {
-  minX: number;
-  maxX: number;
-  minZ: number;
-  maxZ: number;
-}
 
 interface Placement {
   x: number;
@@ -32,18 +29,41 @@ interface Placement {
   scale: number;
 }
 
-// Zonas donde no se siembra decoración: caminos, parcela, almacén y puesto,
-// casas, jardín de Lila, rutas de los NPC (data/npcs.ts) y el spawn.
+// Zonas donde no se siembra decoración: caminos, casas, jardín de Lila, rutas de
+// los NPC (data/npcs.ts), el spawn y lo construido en la granja.
+const around = (x1: number, x2: number, z1: number, z2: number, margin: number): Rect => ({
+  minX: x1 - margin,
+  maxX: x2 + margin,
+  minZ: z1 - margin,
+  maxZ: z2 + margin,
+});
+
 const CLEAR_ZONES: Rect[] = [
   { minX: -1.7, maxX: 1.7, minZ: -28.6, maxZ: 13.5 }, // camino norte-sur + spawn
   { minX: -16.6, maxX: 14.6, minZ: -5.7, maxZ: -2.3 }, // camino este-oeste
-  { minX: 1.4, maxX: 16.8, minZ: 1.4, maxZ: 11 }, // parcela, almacén y puesto
   { minX: -18.5, maxX: -9.5, minZ: -14.5, maxZ: -5.5 }, // casa de Gon
   { minX: -14.5, maxX: -7.5, minZ: -8.5, maxZ: -2.5 }, // ruta de Gon
   { minX: -0.5, maxX: 8.5, minZ: -22.5, maxZ: -13.5 }, // casa de Lila
   { minX: -4, maxX: 4.5, minZ: -17.5, maxZ: -10.5 }, // jardín y ruta de Lila
   { minX: 7.5, maxX: 16.5, minZ: -12.5, maxZ: -3.5 }, // tienda de Marta
-  { minX: -10.5, maxX: -2.5, minZ: 11, maxZ: 19 }, // casa del granjero y su entrada
+  ...Object.values(PENS).map((p) => around(p.x1, p.x2, p.z1, p.z2, 0.8)),
+  around(
+    FARM_CONFIG.origin.x,
+    FARM_CONFIG.origin.x + (FARM_CONFIG.cols - 1) * FARM_CONFIG.spacing,
+    FARM_CONFIG.origin.z,
+    FARM_CONFIG.origin.z + (FARM_CONFIG.rows - 1) * FARM_CONFIG.spacing,
+    1.2,
+  ),
+  around(STORAGE.x, STORAGE.x, STORAGE.z, STORAGE.z, STORAGE.depth / 2 + 1),
+  around(
+    FARMER_HOUSE.x,
+    FARMER_HOUSE.x,
+    FARMER_HOUSE.z,
+    PORCH.stepFrontZ,
+    FARMER_HOUSE.width / 2 + 1,
+  ),
+  around(WELL.x, WELL.x, WELL.z, WELL.z, 2),
+  around(SALES_STAND.x, SALES_STAND.x, SALES_STAND.z, SALES_STAND.z, 2.2),
 ];
 
 // Generador pseudoaleatorio con semilla (mulberry32): el decorado es el
@@ -62,21 +82,14 @@ function rng(seed: number): () => number {
 export class SceneryView {
   scene: Scene;
   world: WorldView;
-  pen: PenConfig;
   trees: number[][];
-  private blocked: Rect[];
   private rocks: (Placement & { variant: number })[];
   private bushes: (Placement & { variant: number })[];
 
-  constructor(scene: Scene, world: WorldView, pen: PenConfig, trees: number[][]) {
+  constructor(scene: Scene, world: WorldView, trees: number[][]) {
     this.scene = scene;
     this.world = world;
-    this.pen = pen;
     this.trees = trees;
-    this.blocked = [
-      ...CLEAR_ZONES,
-      { minX: pen.x1 - 0.8, maxX: pen.x2 + 0.8, minZ: pen.z1 - 0.8, maxZ: pen.z2 + 0.8 },
-    ];
 
     // Las colisiones de rocas y arbustos no dependen de la carga del GLB.
     this.rocks = this.scatter(rng(31), 18, 1.4, 27, (r) => ({ variant: Math.floor(r() * 3) }));
@@ -90,8 +103,8 @@ export class SceneryView {
     void this.load();
   }
 
-  private isFree(x: number, z: number, margin: number): boolean {
-    for (const r of this.blocked) {
+  private isFree(x: number, z: number, margin: number, zones = CLEAR_ZONES): boolean {
+    for (const r of zones) {
       if (
         x > r.minX - margin &&
         x < r.maxX + margin &&
@@ -119,7 +132,8 @@ export class SceneryView {
     for (let tries = 0; out.length < count && tries < count * 60; tries++) {
       const x = (r() * 2 - 1) * half;
       const z = (r() * 2 - 1) * half;
-      if (!this.isFree(x, z, spacing * 0.5)) continue;
+      // Rocas y arbustos chocan: fuera de toda la granja, no solo de lo construido
+      if (!this.isFree(x, z, spacing * 0.5, [...CLEAR_ZONES, FARM_ZONE])) continue;
       if (out.some((p) => Math.hypot(p.x - x, p.z - z) < spacing)) continue;
       out.push({ x, z, rotY: r() * Math.PI * 2, scale: 0.75 + r() * 0.6, ...extra(r) });
     }

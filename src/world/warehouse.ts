@@ -268,12 +268,19 @@ export function warehouseSpotAt(x: number, z: number, y: number): WarehouseSpot 
 
 // ---------- Fachada, en el pueblo ----------
 
-// Planta del edificio (centrada en el GLB, que mide ~2.06×2.2 tras el escalado
+// Planta del edificio (centrada en el GLB, que mide ~3.93×4.2 tras el escalado
 // de la vista), con la puerta en la pared oeste.
-export const STORAGE = { x: 12.47, z: 5, width: 2.06, depth: 2.2, wallThickness: 0.2 };
+export const STORAGE = {
+  x: 25.7,
+  z: 8.6,
+  width: 3.93,
+  depth: 4.2,
+  height: 4.2,
+  wallThickness: 0.2,
+};
 
 const STORAGE_WEST = STORAGE.x - STORAGE.width / 2;
-const STORAGE_DOOR_HALF_WIDTH = 0.55;
+const STORAGE_DOOR_HALF_WIDTH = 0.9;
 const STORAGE_DOOR_MAX_DEPTH = 0.75; // desde el muro, cuánto puede alejarse y seguir frente a ella
 
 /** Paredes macizas: no hay más entrada que la interacción con la puerta. */

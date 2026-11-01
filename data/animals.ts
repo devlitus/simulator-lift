@@ -1,10 +1,10 @@
 // Datos de animales de granja: especies comprables en la tienda, el pienso
-// para alimentarlos y el rectángulo del recinto. Para añadir una especie basta
-// con agregar una entrada; tienda, recinto y guardado la recogen solos.
+// para alimentarlos y el cercado de cada una. Para añadir una especie basta
+// con agregar una entrada; tienda, cercados y guardado la recogen solos (añade también su cercado en PENS).
 import {
   AnimalsSchema,
   FeedSchema,
-  PenConfigSchema,
+  PensSchema,
   type AnimalDef,
   type FeedDef,
   type PenConfig,
@@ -49,13 +49,11 @@ export const ANIMAL_FEED: FeedDef = FeedSchema.parse({
   price: 5,
 });
 
-// Recinto de animales al oeste de la calle, frente a la parcela (ver
-// worldView.buildPen). Los animales pasean siempre dentro de este rectángulo.
-export const PEN: PenConfig = PenConfigSchema.parse({
-  x1: -10,
-  x2: -2.5,
-  z1: 2.5,
-  z2: 8,
-  gateZ1: 4.3, // la puerta al este queda entre z=4.3 y z=6.2
-  gateZ2: 6.2,
+// Un cercado por especie, junto al camino este-oeste (ver worldView.buildPens y
+// docs/plans/distribucion-granja.md). Cada animal pasea siempre dentro del suyo.
+// Son contiguos: comparten valla y la puerta de cada uno da al sur.
+export const PENS: Record<string, PenConfig> = PensSchema.parse({
+  oveja: { x1: 1.6, x2: 5.7, z1: -2.5, z2: 6.3, gateX1: 2.8, gateX2: 4.5 },
+  vaca: { x1: 5.7, x2: 10.6, z1: -2.5, z2: 6.3, gateX1: 7.3, gateX2: 9 },
+  gallina: { x1: 10.6, x2: 16.6, z1: -2.5, z2: 6.3, gateX1: 12.75, gateX2: 14.45 },
 });

@@ -3,7 +3,7 @@
 // puerta desde el que se entra. Medidas de assets/casa_granjero/ a escala de juego.
 
 // Cabaña de 5×4 m con la puerta al sur (+z), mirando a la cámara, y porche delante.
-export const FARMER_HOUSE = { x: -6.5, z: 14, width: 5.2, depth: 4.2, height: 4.8 };
+export const FARMER_HOUSE = { x: 23, z: 15, width: 5.2, depth: 4.2, height: 4.8 };
 
 const { x: X0, z: Z0 } = FARMER_HOUSE;
 const WALL_Z = Z0 + FARMER_HOUSE.depth / 2; // muro de la puerta
@@ -45,7 +45,7 @@ const DOOR_HALF_WIDTH = 0.45;
 const DOOR_MAX_DEPTH = 0.6; // desde el muro, cuánto puede alejarse y seguir frente a ella
 
 export function canEnterDoor(x: number, z: number): boolean {
-  return Math.abs(x - X0) < DOOR_HALF_WIDTH && z - WALL_Z < DOOR_MAX_DEPTH;
+  return Math.abs(x - X0) < DOOR_HALF_WIDTH && z > WALL_Z && z - WALL_Z < DOOR_MAX_DEPTH;
 }
 
 // Altura a la que pisa el granjero: la física va siempre sobre el plano del
