@@ -7,6 +7,8 @@ import { z } from 'zod';
 import type { GameState } from './store';
 import type { TileCrop } from '../crops/farmLogic';
 import type { Animal } from '../animals/animalLogic';
+import { seasonOf } from '../calendar/calendar';
+import { SEASONS } from '../../data/seasons';
 
 const KEY = 'pueblo3d_save_v1';
 
@@ -36,6 +38,7 @@ export type QuestSave = z.infer<typeof QuestSaveSchema>;
 export const SaveSchema = z.object({
   version: z.number().optional(),
   day: z.number().optional(),
+  weather: z.enum(['sol', 'nublado', 'lluvia', 'nieve']).optional(),
   money: z.number().optional(),
   seeds: z.record(z.number()).optional(),
   produce: z.record(z.number()).optional(),
@@ -74,6 +77,7 @@ export function buildSave(
   return {
     version: 1,
     day: state.day,
+    weather: state.weather,
     money: state.money,
     seeds: { ...state.seeds },
     produce: { ...state.produce },
@@ -100,6 +104,8 @@ export function applySave(
   if (!parsed.success) return false;
   const d = parsed.data;
   state.day = d.day ?? state.day;
+  state.season = seasonOf(state.day, SEASONS).id; // derivada: nunca se guarda
+  state.weather = d.weather ?? state.weather; // saves antiguos: se queda el actual
   state.money = d.money ?? state.money;
   Object.assign(state.seeds, d.seeds || {});
   Object.assign(state.produce, d.produce || {});

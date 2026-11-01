@@ -1,9 +1,11 @@
 // FarmLogic (dominio puro, SIN Babylon): reglas de la granja.
 // Plantar, regar, crecimiento por días, marchitez y cosecha sobre datos planos.
+// Cada cultivo solo se planta y crece en sus estaciones; la lluvia riega sola.
 // No crea meshes: la vista (src/crops/farmView.ts) refleja este estado.
 import { EVENTS, EventBus } from '../core/events';
 import { WATERING_CAN_CAPACITY, WILT_DAYS } from '../../data/farm';
-import type { CropDef } from '../../data/schemas';
+import type { CropDef, SeasonId } from '../../data/schemas';
+import { inSeason } from '../calendar/calendar';
 
 export interface TileCrop {
   type: string;
@@ -16,6 +18,7 @@ export interface TileCrop {
 // Estados posibles de un surco (máquina de estados implícita):
 // empty → growing → mature → (cosecha) → empty
 //   growing --(2 días sin agua)--> withered → (limpiar) → empty
+//   growing/mature --(llega una estación que no es la suya)--> withered
 export const TILE_STATUS = {
   EMPTY: 'empty',
   GROWING: 'growing',
@@ -34,6 +37,7 @@ export interface FarmState {
   seeds: Record<string, number>;
   produce: Record<string, number>;
   water: number; // riegos que quedan en la regadera
+  season?: SeasonId; // sin estación (tests antiguos) no hay reglas de temporada
 }
 
 export class FarmLogic {
@@ -62,8 +66,17 @@ export class FarmLogic {
     return { kind: TILE_STATUS.GROWING, crop: c };
   }
 
+  /** El cultivo se puede plantar y crece en la estación actual. */
+  isInSeason(type: string): boolean {
+    return !this.state.season || inSeason(this.crops[type], this.state.season);
+  }
+
   plant(index: number, type: string): boolean {
     if (this.tiles[index] || this.state.seeds[type] <= 0) return false;
+    if (!this.isInSeason(type)) {
+      this.bus.emit(EVENTS.NOTIFY, `📅 ${this.crops[type].name} no se planta en esta estación`);
+      return false;
+    }
     this.state.seeds[type]--;
     this.tiles[index] = { type, stage: 0, watered: false, wiltDays: 0, withered: false };
     this.bus.emit(EVENTS.FARM_CHANGED);
@@ -103,6 +116,38 @@ export class FarmLogic {
     this.bus.emit(EVENTS.INVENTORY_CHANGED);
     this.bus.emit(EVENTS.NOTIFY, `🪣 Regadera llena (${WATERING_CAN_CAPACITY} riegos)`);
     return true;
+  }
+
+  /** Día de lluvia: todos los cultivos vivos quedan regados sin gastar agua. */
+  rain(): number {
+    let watered = 0;
+    for (const c of this.tiles) {
+      if (!c || c.withered || c.watered) continue;
+      c.watered = true;
+      watered++;
+    }
+    if (watered > 0) this.bus.emit(EVENTS.FARM_CHANGED);
+    return watered;
+  }
+
+  /** Estación nueva: se marchitan los cultivos que no son de temporada. */
+  changeSeason(): number {
+    const names = new Set<string>();
+    let withered = 0;
+    for (const c of this.tiles) {
+      if (!c || c.withered || this.isInSeason(c.type)) continue;
+      c.withered = true;
+      names.add(this.crops[c.type].name);
+      withered++;
+    }
+    if (withered > 0) {
+      this.bus.emit(
+        EVENTS.NOTIFY,
+        `🍂 Se acabó la temporada de ${[...names].join(', ')}: ${withered} cultivo(s) marchitos`,
+      );
+      this.bus.emit(EVENTS.FARM_CHANGED);
+    }
+    return withered;
   }
 
   clear(index: number): boolean {

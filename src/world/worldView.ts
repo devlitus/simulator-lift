@@ -1,9 +1,11 @@
 // WorldView (vista Babylon): terreno, edificios, decoración, colisiones
 // estáticas, luces y ciclo día/noche. No contiene reglas de juego; solo
 // mide el paso del tiempo y emite DAY_NEW cuando empieza un día nuevo.
+// El clima y la estación (src/calendar/) solo tiñen el cielo, la luz y el césped.
 import { CONFIG } from '../core/constants';
 import { EVENTS, EventBus } from '../core/events';
 import type { PenConfig } from '../../data/schemas';
+import type { WeatherKind } from '../calendar/calendar';
 import { ShadowGenerator } from '@babylonjs/core/Lights/Shadows/shadowGenerator';
 import { DirectionalLight } from '@babylonjs/core/Lights/directionalLight';
 import { HemisphericLight } from '@babylonjs/core/Lights/hemisphericLight';
@@ -66,6 +68,19 @@ export class WorldView {
   private nightGlow: { mat: PBRMaterial; r: number; g: number; b: number }[] = []; // de noche
   indoors = false; // el granjero está en un interior: su casa o el almacén
   daylight = 1; // luz diurna fuera: 0 de noche, 1 al mediodía
+  private overcast = 0; // 0 despejado, 1 cielo cubierto de lluvia o nieve
+  private grassBase = new Color3(0.86, 0.9, 0.84); // tinte del césped sin estación
+
+  /** Nublado y lluvia apagan el sol y agrisan el cielo. */
+  setWeather(weather: WeatherKind): void {
+    this.overcast = { sol: 0, nublado: 0.45, lluvia: 0.8, nieve: 0.6 }[weather];
+  }
+
+  /** Tiñe el césped (y las colinas, que comparten material) con el color de la estación. */
+  setSeasonTint(hex: string): void {
+    const mat = this.ground.material as StandardMaterial;
+    mat.diffuseColor = this.grassBase.multiply(Color3.FromHexString(hex));
+  }
 
   constructor(
     scene: Scene,
@@ -140,7 +155,7 @@ export class WorldView {
     const grass = new Texture('/textures/cesped.jpg', this.scene);
     grass.uScale = grass.vScale = s / 5;
     mat.diffuseTexture = grass;
-    mat.diffuseColor = new Color3(0.86, 0.9, 0.84);
+    mat.diffuseColor = this.grassBase.clone();
     mat.ambientTexture = new Texture('/textures/variacion_suelo.jpg', this.scene);
     ground.material = mat;
     ground.receiveShadows = true;
@@ -1279,8 +1294,10 @@ export class WorldView {
     let f = 0;
     if (h > 6 && h < 20) f = Math.sin(((h - 6) / 14) * Math.PI);
 
-    this.sun.intensity = 0.1 + f * 1.0;
-    this.hemi.intensity = 0.16 + f * 0.55;
+    // El cielo cubierto quita casi todo el sol directo y algo de luz ambiente
+    const o = this.overcast;
+    this.sun.intensity = 0.1 + f * 1.0 * (1 - 0.75 * o);
+    this.hemi.intensity = 0.16 + f * 0.55 * (1 - 0.25 * o);
 
     // El sol recorre el cielo de este a oeste durante el día
     if (f > 0.01) {
@@ -1298,6 +1315,11 @@ export class WorldView {
       1,
     );
     const sky = this.scene.clearColor;
+    // Cubierto: el azul se mezcla con un gris de su misma luminosidad
+    const gris = (sky.r + sky.g + sky.b) / 3;
+    sky.r += (gris - sky.r) * o;
+    sky.g += (gris - sky.g) * o;
+    sky.b += (gris - sky.b) * o;
     this.scene.fogColor.copyFromFloats(sky.r, sky.g, sky.b);
 
     // Luz cálida en las ventanas de casa y en los faroles de la entrada al anochecer

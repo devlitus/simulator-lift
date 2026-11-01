@@ -2,7 +2,16 @@
 // Es un objeto plano mutable compartido: los sistemas de dominio lo mutan y
 // notifican el cambio emitiendo eventos por el EventBus (ver core/events.ts).
 import { WATERING_CAN_CAPACITY } from '../../data/farm';
-import type { AnimalDef, BalanceConfig, CropDef, GiftDef, NpcDef } from '../../data/schemas';
+import { SEASONS } from '../../data/seasons';
+import { seasonOf, type WeatherKind } from '../calendar/calendar';
+import type {
+  AnimalDef,
+  BalanceConfig,
+  CropDef,
+  GiftDef,
+  NpcDef,
+  SeasonId,
+} from '../../data/schemas';
 
 // Forma del estado central compartido por todos los sistemas de dominio.
 // Es un objeto plano e intencionalmente sin métodos: la lógica vive en las
@@ -10,6 +19,10 @@ import type { AnimalDef, BalanceConfig, CropDef, GiftDef, NpcDef } from '../../d
 // que lo reciben por constructor y lo mutan directamente.
 export interface GameState {
   day: number;
+  /** estación del día actual: se deriva de `day` (no se guarda) */
+  season: SeasonId;
+  /** clima de hoy (se tira al empezar cada día) */
+  weather: WeatherKind;
   money: number;
   seeds: Record<string, number>;
   produce: Record<string, number>;
@@ -48,6 +61,8 @@ export function createInitialState(
 
   return {
     day: 1,
+    season: seasonOf(1, SEASONS).id,
+    weather: 'sol', // el primer día de partida siempre hace bueno
     money: balance.startMoney,
     seeds,
     produce,

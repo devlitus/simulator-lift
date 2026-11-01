@@ -12,6 +12,7 @@ const CROPS: Record<string, CropDef> = {
     sellPrice: 25,
     daysToGrow: 2,
     color: '#e07b2a',
+    seasons: ['primavera'],
   },
 };
 
@@ -132,6 +133,46 @@ describe('FarmLogic', () => {
     });
     farm.harvest(0);
     expect(payload).toEqual({ type: 'zanahoria' });
+  });
+
+  it('no planta fuera de temporada', () => {
+    state.season = 'verano';
+    expect(farm.plant(0, 'zanahoria')).toBe(false);
+    expect(state.seeds.zanahoria).toBe(2); // no gasta la semilla
+    state.season = 'primavera';
+    expect(farm.plant(0, 'zanahoria')).toBe(true);
+  });
+
+  it('la lluvia riega los cultivos vivos sin gastar agua', () => {
+    farm.plant(0, 'zanahoria');
+    farm.plant(1, 'zanahoria');
+    expect(farm.rain()).toBe(2);
+    expect(state.water).toBe(WATERING_CAN_CAPACITY);
+    farm.newDay();
+    expect(farm.status(0).crop!.stage).toBe(1);
+    expect(farm.water(0)).toBe(true); // el día siguiente vuelve a necesitar agua
+  });
+
+  it('la lluvia no resucita cultivos marchitos', () => {
+    farm.plant(0, 'zanahoria');
+    for (let i = 0; i < WILT_DAYS; i++) farm.newDay();
+    expect(farm.rain()).toBe(0);
+    expect(farm.status(0).kind).toBe(TILE_STATUS.WITHERED);
+  });
+
+  it('al cambiar de estación se marchitan los cultivos que no son de temporada', () => {
+    state.season = 'primavera';
+    farm.plant(0, 'zanahoria');
+    state.season = 'verano';
+    expect(farm.changeSeason()).toBe(1);
+    expect(farm.status(0).kind).toBe(TILE_STATUS.WITHERED);
+  });
+
+  it('al cambiar de estación respeta los cultivos que siguen en temporada', () => {
+    state.season = 'primavera';
+    farm.plant(0, 'zanahoria');
+    expect(farm.changeSeason()).toBe(0);
+    expect(farm.status(0).kind).toBe(TILE_STATUS.GROWING);
   });
 
   it('serializa y restaura el estado de la parcela', () => {

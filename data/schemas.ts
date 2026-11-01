@@ -4,6 +4,31 @@
 // dominio se derivan de aquí con z.infer (ver ADR 0009).
 import { z } from 'zod';
 
+// Estaciones del año: los cultivos declaran en cuáles se plantan y crecen.
+export const SeasonIdSchema = z.enum(['primavera', 'verano', 'otono', 'invierno']);
+export type SeasonId = z.infer<typeof SeasonIdSchema>;
+
+export const SeasonSchema = z
+  .object({
+    id: SeasonIdSchema,
+    name: z.string(),
+    icon: z.string(),
+    rainChance: z.number().min(0).max(1), // probabilidad de que un día llueva (o nieve)
+    cloudChance: z.number().min(0).max(1), // probabilidad de un día nublado sin lluvia
+    precipitation: z.enum(['lluvia', 'nieve']), // la lluvia riega; la nieve es solo visual
+    grassTint: z.string().regex(/^#[0-9a-fA-F]{6}$/), // tinte del césped en la vista
+  })
+  .refine((s) => s.rainChance + s.cloudChance <= 1, {
+    message: 'rainChance + cloudChance no puede pasar de 1',
+  });
+export type SeasonDef = z.infer<typeof SeasonSchema>;
+
+export const SeasonsConfigSchema = z.object({
+  daysPerSeason: z.number().int().positive(),
+  seasons: z.array(SeasonSchema).min(1), // en orden; tras la última vuelve la primera
+});
+export type SeasonsConfig = z.infer<typeof SeasonsConfigSchema>;
+
 export const CropSchema = z.object({
   name: z.string(),
   icon: z.string(),
@@ -11,6 +36,7 @@ export const CropSchema = z.object({
   sellPrice: z.number().int().positive(),
   daysToGrow: z.number().int().positive(),
   color: z.string().regex(/^#[0-9a-fA-F]{6}$/),
+  seasons: z.array(SeasonIdSchema).min(1), // estaciones en que se planta y crece
 });
 export type CropDef = z.infer<typeof CropSchema>;
 export const CropsSchema = z.record(CropSchema);
