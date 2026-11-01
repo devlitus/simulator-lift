@@ -11,6 +11,7 @@ import type { QuestSystem, Quest } from '../quests/questSystem';
 import type { Economy } from '../economy/economy';
 import type { AnimalLogic } from '../animals/animalLogic';
 import type { AnimalDef, CropDef, FeedDef, GiftDef } from '../../data/schemas';
+import { WATERING_CAN_CAPACITY } from '../../data/farm';
 import type { DialogButton } from '../core/types';
 
 // Los elementos del HUD existen siempre en index.html: el ! es seguro aquí
@@ -138,6 +139,10 @@ export class GameUI {
 
     parts.push('<span class="inv-label">Granja</span>');
     parts.push('<span class="inv-section">');
+    const noWater = s.water === 0 ? ' empty' : '';
+    parts.push(
+      `<span class="item${noWater}" title="Riegos en la regadera (llénala en el pozo)">💧${s.water}/${WATERING_CAN_CAPACITY}</span>`,
+    );
     const noFeed = s.feed === 0 ? ' empty' : '';
     parts.push(`<span class="item${noFeed}">${this.feedDef.icon}×${s.feed}</span>`);
     Object.keys(this.animals).forEach((key) => {

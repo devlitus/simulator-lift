@@ -17,6 +17,7 @@ function makeState(): GameState {
     produce: { zanahoria: 2 },
     gifts: { flor: 1 },
     feed: 2,
+    water: 3,
     animalProducts: { oveja: 1 },
     selectedSeed: 'zanahoria',
     friendships: { marta: 5 },
@@ -46,6 +47,7 @@ describe('buildSave / applySave', () => {
       seeds: { zanahoria: 1 },
       produce: { zanahoria: 2 },
       feed: 2,
+      water: 3,
       animalProducts: { oveja: 1 },
     });
     expect(data.farm).toEqual(fakeFarm.serialize());
@@ -61,6 +63,7 @@ describe('buildSave / applySave', () => {
       produce: {},
       gifts: {},
       feed: 0,
+      water: 5,
       animalProducts: {},
       selectedSeed: 'x',
       friendships: {},
@@ -73,6 +76,7 @@ describe('buildSave / applySave', () => {
       produce: {},
       gifts: {},
       feed: 4,
+      water: 1,
       animalProducts: { oveja: 2 },
       selectedSeed: 'tomate',
       friendships: { gon: 2 },
@@ -93,6 +97,7 @@ describe('buildSave / applySave', () => {
     expect(state.money).toBe(200);
     expect(state.seeds).toEqual({ tomate: 3 });
     expect(state.feed).toBe(4);
+    expect(state.water).toBe(1);
     expect(state.animalProducts).toEqual({ oveja: 2 });
     expect(loadedAnimals).toEqual(saved.animals);
     expect(state.talkedToday).toEqual({}); // se resetea al cargar
@@ -104,6 +109,7 @@ describe('buildSave / applySave', () => {
     expect(applySave(saved, state, fakeFarm, fakeQuests, fakeAnimals)).toBe(true);
     expect(state.day).toBe(7);
     expect(state.feed).toBe(2); // conserva el valor actual
+    expect(state.water).toBe(3); // saves sin regadera conservan el agua actual
     expect(state.animalProducts).toEqual({ oveja: 1 });
   });
 

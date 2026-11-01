@@ -291,9 +291,15 @@ export class FarmView {
       default: {
         const c = status.crop!;
         const def = this.crops[c.type];
+        if (!c.watered && this.state.water <= 0) {
+          return {
+            label: `🪣 Regadera vacía — llénala en el pozo (${def.name} ${c.stage}/${def.daysToGrow})`,
+            action: null,
+          };
+        }
         if (!c.watered) {
           return {
-            label: `E: Regar ${def.name} (${c.stage}/${def.daysToGrow})`,
+            label: `E: Regar ${def.name} (${c.stage}/${def.daysToGrow}) · 💧 ${this.state.water}`,
             action: () => this.logic.water(i),
           };
         }

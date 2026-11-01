@@ -26,7 +26,7 @@ import type { Interaction } from './core/types';
 
 import { BALANCE } from '../data/balance';
 import { CROPS } from '../data/crops';
-import { FARM_CONFIG } from '../data/farm';
+import { FARM_CONFIG, WATERING_CAN_CAPACITY } from '../data/farm';
 import { ANIMALS, ANIMAL_FEED, PEN } from '../data/animals';
 import { GIFTS } from '../data/gifts';
 import { NPC_DEFS } from '../data/npcs';
@@ -91,6 +91,10 @@ const ui = new GameUI(
 const npcs = new NPCSystemView(scene, world, state, ui, quests, friendship, NPC_DEFS, CROPS);
 const saveRepo = new SaveRepository(window.localStorage);
 
+// Distancia al punto de la manivela para poder girarla (el pozo, con su
+// colisión, impide acercarse más desde ese lado).
+const CRANK_RADIUS = 0.9;
+
 // ---------- Cámara de seguimiento estilo Stardew ----------
 // Vista aérea con orientación fija (pitch 45°, mirando hacia -z): la cámara
 // sigue al personaje centrada, con suavizado exponencial, y nunca gira.
@@ -130,11 +134,30 @@ function saveGame(silent = false): void {
 
 function loadGame(): boolean {
   const data = saveRepo.load();
-  return applySave(data, state, farmLogic, quests, animalLogic);
+  const ok = applySave(data, state, farmLogic, quests, animalLogic);
+  if (ok) bus.emit(EVENTS.INVENTORY_CHANGED); // el HUD se pintó antes de cargar
+  return ok;
 }
 
 // ---------- Riego: el granjero anima la regadera sobre el surco ----------
 bus.on(EVENTS.FARM_WATERED, ({ index }) => player.playWater(farmView.tiles[index]));
+// Pozo: con P junto a la manivela el cubo baja y sube; al llegar arriba se
+// llena la regadera. Sin el GLB no hay cubo que animar y se llena al momento.
+function nearCrank(): boolean {
+  const c = world.wellCrank;
+  const p = player.position;
+  return Math.hypot(p.x - c.x, p.z - c.z) < CRANK_RADIUS;
+}
+
+function drawWater(): void {
+  if (!farmLogic.canRefill() || player.busy || ui.modalOpen || !nearCrank()) return;
+  if (!world.wellView) {
+    farmLogic.refillWater();
+    return;
+  }
+  const segundos = world.wellView.play(() => farmLogic.refillWater());
+  player.playRefill(world.well, segundos);
+}
 
 // ---------- Ciclo de día nuevo ----------
 bus.on(EVENTS.DAY_NEW, ({ day }) => {
@@ -177,7 +200,27 @@ function findInteraction(): Interaction | null {
     });
   }
 
-  candidates.sort((a, b) => a.dist - b.dist);
+  const well = world.well;
+  const dWell = Math.hypot(p.x - well.x, p.z - well.z);
+  if (dWell < CONFIG.interactionRadius || nearCrank()) {
+    const agua = `💧 ${state.water}/${WATERING_CAN_CAPACITY}`;
+    let label = `Regadera llena ${agua}`;
+    if (farmLogic.canRefill()) {
+      label = nearCrank()
+        ? `P: Girar la manivela y llenar la regadera (${agua})`
+        : `Ve al lado de la manivela para llenar la regadera (${agua})`;
+    }
+    candidates.push({
+      dist: Math.min(dWell, Math.hypot(p.x - world.wellCrank.x, p.z - world.wellCrank.z)),
+      label,
+      action: farmLogic.canRefill() && nearCrank() ? drawWater : null,
+      key: 'p',
+    });
+  }
+
+  // Lo que se puede hacer gana a los avisos sin acción; después, lo más cercano.
+  // Así, entre la parcela y el pozo, "Llenar la regadera" no queda tapado.
+  candidates.sort((a, b) => Number(!a.action) - Number(!b.action) || a.dist - b.dist);
   return candidates[0] || null;
 }
 
@@ -191,9 +234,10 @@ window.addEventListener('keydown', (e) => {
   if (k.startsWith('arrow') || k === ' ') e.preventDefault();
 
   if (k === 'e' && !e.repeat) {
-    if (!ui.modalOpen && currentInteraction && currentInteraction.action) {
-      currentInteraction.action();
-    }
+    const i = currentInteraction;
+    if (!ui.modalOpen && i && i.action && (i.key ?? 'e') === 'e') i.action();
+  } else if (k === 'p' && !e.repeat) {
+    drawWater(); // el pozo responde a P aunque otra interacción ocupe la pista
   } else if (k === 'escape') {
     ui.closeModals();
   } else if (k === 'h' && !e.repeat) {

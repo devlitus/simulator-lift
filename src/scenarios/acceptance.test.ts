@@ -16,7 +16,7 @@ import { GIFTS } from '../../data/gifts';
 import { NPC_DEFS } from '../../data/npcs';
 import { ANIMALS, ANIMAL_FEED } from '../../data/animals';
 import { QUEST_DEFS } from '../../data/quests';
-import { FARM_CONFIG, WILT_DAYS } from '../../data/farm';
+import { FARM_CONFIG, WATERING_CAN_CAPACITY, WILT_DAYS } from '../../data/farm';
 
 const TILE_COUNT = FARM_CONFIG.cols * FARM_CONFIG.rows;
 
@@ -32,9 +32,12 @@ function makeWorld() {
 }
 
 // Riega todos los cultivos vivos y avanza un día (el ciclo diario del jugador).
+// Cuando la regadera se vacía, el jugador va al pozo a llenarla.
 function waterAllAndNewDay(farm: FarmLogic): void {
   farm.tiles.forEach((tile, i) => {
-    if (tile && !tile.withered) farm.water(i);
+    if (!tile || tile.withered) return;
+    if (farm.state.water === 0) farm.refillWater();
+    farm.water(i);
   });
   farm.newDay();
 }
@@ -79,6 +82,34 @@ describe('Escenario: el ciclo económico de la granja es rentable', () => {
     expect(economy.sellAllProduce()).toBe(0);
     expect(state.money).toBe(moneyAfterBuy); // perdió el precio de la semilla
     expect(state.money).toBeLessThan(BALANCE.startMoney);
+  });
+});
+
+describe('Escenario: la regadera se vacía y se llena en el pozo', () => {
+  it('empieza llena, riega 5 surcos y obliga a ir al pozo para el sexto', () => {
+    const { state, farm, economy } = makeWorld();
+    state.money = 1000;
+    const surcos = WATERING_CAN_CAPACITY + 1;
+    for (let i = 0; i < surcos; i++) {
+      economy.buySeed('zanahoria');
+      farm.plant(i, 'zanahoria');
+    }
+
+    expect(state.water).toBe(WATERING_CAN_CAPACITY);
+    for (let i = 0; i < WATERING_CAN_CAPACITY; i++) expect(farm.water(i)).toBe(true);
+    expect(state.water).toBe(0);
+    expect(farm.water(WATERING_CAN_CAPACITY)).toBe(false); // sin agua no riega
+
+    expect(farm.refillWater()).toBe(true); // visita al pozo
+    expect(farm.water(WATERING_CAN_CAPACITY)).toBe(true);
+    expect(state.water).toBe(WATERING_CAN_CAPACITY - 1);
+  });
+
+  it('el agua de la regadera no se repone sola al cambiar de día', () => {
+    const { state, farm } = makeWorld();
+    state.water = 1;
+    farm.newDay();
+    expect(state.water).toBe(1);
   });
 });
 
