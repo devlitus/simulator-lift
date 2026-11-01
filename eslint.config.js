@@ -14,16 +14,14 @@ export default tseslint.config(
     languageOptions: {
       globals: {
         ...globals.browser,
-        BABYLON: 'readonly',
-        CANNON: 'readonly',
       },
     },
     rules: {
       eqeqeq: 'error',
       curly: ['error', 'multi-line'],
       '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
-      // Babylon/Cannon entran como UMD sin tipos: `any` es inevitable en las vistas
-      '@typescript-eslint/no-explicit-any': 'off',
+      // Babylon y Cannon llegan con tipos desde npm (ADR 0010): sin `any`
+      '@typescript-eslint/no-explicit-any': 'error',
     },
   },
   {

@@ -13,3 +13,4 @@ Cada archivo documenta una decisión de diseño relevante para el mantenimiento 
 | [0007](0007-cannon-js-para-fisica.md) | Cannon.js (API V1 de Babylon) como motor de física |
 | [0008](0008-vite-como-bundler-y-despliegue-en-vercel.md) | Vite como bundler y dev-server, con despliegue en Vercel |
 | [0009](0009-migracion-a-typescript-con-zod.md) | Migración a TypeScript con esquemas Zod para el contenido |
+| [0010](0010-babylon-y-cannon-desde-npm.md) | Babylon.js y Cannon.js desde npm como módulos ES, con tipos reales |

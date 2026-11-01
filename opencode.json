@@ -3,9 +3,7 @@
   "mcp": {
     "comfy-mcp": {
       "type": "local",
-      "command": [
-        "/home/carle/ai/ComfyUI/.venv/bin/comfy-mcp"
-      ],
+      "command": ["/home/carle/ai/ComfyUI/.venv/bin/comfy-mcp"],
       "environment": {
         "COMFY_BIN": "/home/carle/ai/ComfyUI/.venv/bin/comfy",
         "COMFY_PROJECT": "/home/carle/ai/ComfyUI",

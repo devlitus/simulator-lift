@@ -1,6 +1,22 @@
 // main.ts: punto de entrada. Crea el motor, el bus de eventos y el estado
 // central, y cablea dominio + vistas + UI + guardado. No contiene reglas de
 // juego propias: solo wiring e input.
+import { FreeCamera } from '@babylonjs/core/Cameras/freeCamera';
+import { Engine } from '@babylonjs/core/Engines/engine';
+import { Vector3 } from '@babylonjs/core/Maths/math.vector';
+import { CannonJSPlugin } from '@babylonjs/core/Physics/v1/Plugins/cannonJSPlugin';
+import { Scene } from '@babylonjs/core/scene';
+// Babylon se importa por rutas para que Vite descarte lo que no se usa. Las
+// piezas que la escena necesita y que solo se registran como efecto lateral
+// van aquí, en un único sitio:
+import '@babylonjs/loaders/glTF'; // cargador de .glb para SceneLoader
+import '@babylonjs/core/Physics/joinedPhysicsEngineComponent'; // scene.enablePhysics
+import '@babylonjs/core/Physics/v1/physicsEngineComponent'; // impostores (física V1)
+import '@babylonjs/core/Lights/Shadows/shadowGeneratorSceneComponent'; // sombras
+import '@babylonjs/core/Particles/particleSystemComponent'; // partículas (riego)
+import '@babylonjs/core/Animations/animatable'; // AnimationGroup.start
+import * as CANNON from 'cannon';
+
 import { CONFIG } from './core/constants';
 import { EVENTS, EventBus } from './core/events';
 import { createInitialState } from './core/store';
@@ -29,8 +45,8 @@ import { GameUI } from './ui/ui';
 
 // ---------- Motor y escena ----------
 const canvas = document.getElementById('renderCanvas') as HTMLCanvasElement;
-const engine = new BABYLON.Engine(canvas, true, { powerPreference: 'high-performance' });
-const scene = new BABYLON.Scene(engine);
+const engine = new Engine(canvas, true, { powerPreference: 'high-performance' });
+const scene = new Scene(engine);
 
 // Sin GPU real (render por software) el relleno de píxeles es el cuello de
 // botella: bajamos resolución interna y desactivamos sombras para ser jugables.
@@ -39,10 +55,7 @@ const lowSpec = /swiftshader|software|llvmpipe/.test(glRenderer);
 if (lowSpec) engine.setHardwareScalingLevel(2);
 
 // Física: Cannon.js (ligero, JS puro, suficiente para colisiones caja/estático)
-scene.enablePhysics(
-  new BABYLON.Vector3(0, -9.81, 0),
-  new BABYLON.CannonJSPlugin(true, 10, window.CANNON),
-);
+scene.enablePhysics(new Vector3(0, -9.81, 0), new CannonJSPlugin(true, 10, CANNON));
 
 // ---------- Bus de eventos + estado central ----------
 const bus = new EventBus();
@@ -79,9 +92,9 @@ const saveRepo = new SaveRepository(window.localStorage);
 // Vista aérea con orientación fija (pitch 45°, mirando hacia -z): la cámara
 // sigue al personaje centrada, con suavizado exponencial, y nunca gira.
 // La rueda del ratón ajusta el zoom (acercar/alejar manteniendo el ángulo).
-const camera = new BABYLON.FreeCamera('cam', new BABYLON.Vector3(0, 12, 24), scene);
-const camTarget = new BABYLON.Vector3(0, 0, 12); // punto de mira, arranca en el jugador
-const camLookAt = new BABYLON.Vector3(0, 1, 12); // scratch para setTarget
+const camera = new FreeCamera('cam', new Vector3(0, 12, 24), scene);
+const camTarget = new Vector3(0, 0, 12); // punto de mira, arranca en el jugador
+const camLookAt = new Vector3(0, 1, 12); // scratch para setTarget
 let camZoom: number = CONFIG.camZoomStart;
 
 canvas.addEventListener('wheel', (e) => {

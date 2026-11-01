@@ -11,22 +11,29 @@ import type { GameUI } from '../ui/ui';
 import type { QuestSystem } from '../quests/questSystem';
 import type { Friendship } from './friendship';
 import type { Interaction, DialogButton } from '../core/types';
+import { SceneLoader } from '@babylonjs/core/Loading/sceneLoader';
+import { StandardMaterial } from '@babylonjs/core/Materials/standardMaterial';
+import { Color3 } from '@babylonjs/core/Maths/math.color';
+import { Vector3 } from '@babylonjs/core/Maths/math.vector';
+import { MeshBuilder } from '@babylonjs/core/Meshes/meshBuilder';
+import { TransformNode } from '@babylonjs/core/Meshes/transformNode';
+import type { AnimationGroup, Mesh, Scene } from '@babylonjs/core';
 
 interface NpcInstance {
   def: NpcDef;
   id: string;
   name: string;
-  root: any;
+  root: TransformNode;
   waypoints: NpcDef['waypoints'];
   wpIndex: number;
   wpDir: number;
   speed: number;
-  anims?: { walk?: any; idle?: any };
+  anims?: { walk?: AnimationGroup; idle?: AnimationGroup };
   animActual?: string | null;
 }
 
 export class NPCSystemView {
-  scene: any;
+  scene: Scene;
   state: GameState;
   ui: GameUI;
   quests: QuestSystem;
@@ -35,7 +42,7 @@ export class NPCSystemView {
   npcs: NpcInstance[];
 
   constructor(
-    scene: any,
+    scene: Scene,
     world: WorldView,
     state: GameState,
     ui: GameUI,
@@ -53,28 +60,24 @@ export class NPCSystemView {
     this.npcs = npcDefs.map((def) => this.buildNPC(scene, world, def));
   }
 
-  buildNPC(scene: any, world: WorldView, def: NpcDef): NpcInstance {
-    const root = new BABYLON.TransformNode(`npc_${def.id}`, scene);
+  buildNPC(scene: Scene, world: WorldView, def: NpcDef): NpcInstance {
+    const root = new TransformNode(`npc_${def.id}`, scene);
     root.position.set(def.home.x, 0, def.home.z);
 
     const mat = (r: number, g: number, b: number) => {
-      const m = new BABYLON.StandardMaterial('npcmat', scene);
-      m.diffuseColor = new BABYLON.Color3(r, g, b);
-      m.specularColor = BABYLON.Color3.Black();
+      const m = new StandardMaterial('npcmat', scene);
+      m.diffuseColor = new Color3(r, g, b);
+      m.specularColor = Color3.Black();
       return m;
     };
 
-    const body = BABYLON.MeshBuilder.CreateCylinder(
-      'npcBody',
-      { height: 1.0, diameter: 0.55 },
-      scene,
-    );
+    const body = MeshBuilder.CreateCylinder('npcBody', { height: 1.0, diameter: 0.55 }, scene);
     body.parent = root;
     body.position.y = 0.5;
     body.material = mat(...def.color);
     world.addShadow(body);
 
-    const head = BABYLON.MeshBuilder.CreateSphere('npcHead', { diameter: 0.5 }, scene);
+    const head = MeshBuilder.CreateSphere('npcHead', { diameter: 0.5 }, scene);
     head.parent = root;
     head.position.y = 1.25;
     head.material = mat(0.95, 0.8, 0.65);
@@ -83,15 +86,11 @@ export class NPCSystemView {
     // Accesorio distintivo (sombrero / casco / flor)
     let acc;
     if (def.id === 'lila') {
-      acc = BABYLON.MeshBuilder.CreateSphere('npcAcc', { diameter: 0.2 }, scene);
+      acc = MeshBuilder.CreateSphere('npcAcc', { diameter: 0.2 }, scene);
       acc.position.set(0.22, 1.5, 0);
       acc.material = mat(0.95, 0.4, 0.4);
     } else {
-      acc = BABYLON.MeshBuilder.CreateBox(
-        'npcAcc',
-        { width: 0.55, height: 0.16, depth: 0.55 },
-        scene,
-      );
+      acc = MeshBuilder.CreateBox('npcAcc', { width: 0.55, height: 0.16, depth: 0.55 }, scene);
       acc.position.set(0, 1.52, 0);
       acc.material = def.id === 'marta' ? mat(0.7, 0.25, 0.45) : mat(0.25, 0.26, 0.3);
     }
@@ -123,12 +122,12 @@ export class NPCSystemView {
   // como el granjero; Marta es estática y no trae animaciones.
   private async _loadNpcModel(
     world: WorldView,
-    root: any,
-    primitivas: any[],
+    root: TransformNode,
+    primitivas: Mesh[],
     file: string,
   ): Promise<void> {
     try {
-      const res = await BABYLON.SceneLoader.ImportMeshAsync('', '/models/', file, this.scene);
+      const res = await SceneLoader.ImportMeshAsync('', '/models/', file, this.scene);
       const model = res.meshes[0];
       // Se escala a la altura del NPC de primitivas (~1.5 m) y se apoya en
       // el suelo a partir de la caja envolvente real del modelo, como el
@@ -136,7 +135,7 @@ export class NPCSystemView {
       const { min, max } = model.getHierarchyBoundingVectors(true);
       const escala = 1.5 / (max.y - min.y);
       model.parent = root;
-      model.scaling = new BABYLON.Vector3(escala, escala, escala);
+      model.scaling = new Vector3(escala, escala, escala);
       model.position.y = -min.y * escala;
       for (const m of res.meshes) {
         if (m.getTotalVertices() > 0) world.addShadow(m);
@@ -150,7 +149,7 @@ export class NPCSystemView {
 
   // Recoge walk/idle del GLB y arranca en idle en bucle (patrón playerView).
   // Sin grupos (Marta, o fallback), el NPC se mueve sin animar, como antes.
-  private _cargarAnimaciones(root: any, grupos: any[]): void {
+  private _cargarAnimaciones(root: TransformNode, grupos: AnimationGroup[]): void {
     const npc = this.npcs.find((n) => n.root === root);
     if (!npc) return;
     npc.anims = {};

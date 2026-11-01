@@ -1,6 +1,6 @@
 # 0007 — Cannon.js (API V1 de Babylon) como motor de física
 
-**Estado:** Aceptada (decisión heredada de la v1, documentada aquí de forma retroactiva)
+**Estado:** Aceptada (decisión heredada de la v1, documentada aquí de forma retroactiva) · Desde [0010](0010-babylon-y-cannon-desde-npm.md), Cannon llega desde npm (`cannon` 0.6.2) en vez de vendorizado
 
 ## Contexto
 
