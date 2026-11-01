@@ -33,7 +33,12 @@ import {
   WELL,
 } from './farmLayout';
 import { STORAGE, STORAGE_WALLS } from './warehouse';
+import { SHOP_BUILDING, SHOPS, shopColliders, type ShopDef } from './marketLayout';
+import { TREE_SPOTS } from './treeSpots';
 import { WellView } from './wellView';
+
+// El camino este-oeste llega hasta la última tienda del mercado
+const EAST_WEST_END_X = Math.max(...SHOPS.map((s) => s.x)) + 3;
 
 interface PathTile {
   x: number;
@@ -42,20 +47,6 @@ interface PathTile {
   depth: number;
   variant: number;
 }
-
-// Árboles del pueblo; SceneryView no siembra decoración encima de ellos.
-export const TREE_SPOTS: number[][] = [
-  [-6, 5],
-  [-10, 9],
-  [-13, 6],
-  [-20, 3],
-  [7, -11],
-  [-7, -14],
-  [21, -12],
-  [-18, 12],
-  [-4, 13],
-  [-16, -16],
-];
 
 export class WorldView {
   scene: Scene;
@@ -193,8 +184,13 @@ export class WorldView {
     p1.position.set(0, 0.02, (STREET_END_Z - 28) / 2);
     p1.material = sand;
     p1.receiveShadows = true;
-    const p2 = MeshBuilder.CreateBox('path2', { width: 30, height: 0.04, depth: 2.2 }, this.scene);
-    p2.position.set(-1, 0.02, -4);
+    // Camino este-oeste: de la casa de Gon a la tienda de Marta
+    const p2 = MeshBuilder.CreateBox(
+      'path2',
+      { width: EAST_WEST_END_X + 16, height: 0.04, depth: 2.2 },
+      this.scene,
+    );
+    p2.position.set((EAST_WEST_END_X - 16) / 2, 0.02, -4);
     p2.material = sand;
     p2.receiveShadows = true;
     const { minX, maxX, minZ, maxZ } = ENTRANCE_PATH;
@@ -214,7 +210,7 @@ export class WorldView {
     const tiles = new Map<string, PathTile>();
     const paths = [
       { minX: -1.1, maxX: 1.1, minZ: -28, maxZ: STREET_END_Z },
-      { minX: -16, maxX: 14, minZ: -5.1, maxZ: -2.9 },
+      { minX: -16, maxX: EAST_WEST_END_X, minZ: -5.1, maxZ: -2.9 },
       ENTRANCE_PATH,
     ];
     for (const path of paths) {
@@ -410,7 +406,7 @@ export class WorldView {
   }
 
   buildBuildings(): void {
-    this.buildMartaShop();
+    for (const shop of SHOPS) this.buildShop(shop); // el mercado
     this.buildGonHouse();
     this.buildLilaHouse();
     this.buildFarmerHouse(); // Casa del granjero, al sur del almacén
@@ -496,94 +492,100 @@ export class WorldView {
     }
   }
 
-  // Tienda de Marta: modelo GLB texturizado con una casa y escaparate de
-  // respaldo. La colisión es independiente, para no depender de la malla
-  // importada ni dejar que el jugador atraviese el edificio durante la carga.
-  buildMartaShop(): void {
-    const x = 12;
-    const z = -8;
-    const hit = MeshBuilder.CreateBox(
-      'martaShopHit',
-      { width: 4.7, height: 4.8, depth: 4.2 },
-      this.scene,
-    );
-    hit.position.set(x, 2.4, z);
-    hit.isVisible = false;
-    hit.physicsImpostor = new PhysicsImpostor(
-      hit,
-      PhysicsImpostor.BoxImpostor,
-      { mass: 0 },
-      this.scene,
-    );
+  // Tienda del mercado (assets/tiendas/): colisiones fijas, primitivas de
+  // respaldo y el letrero del hastial rotulado. El GLB está en metros, con la
+  // puerta hacia +z (la calle y la cámara); por dentro es otro escenario.
+  buildShop(shop: ShopDef): void {
+    const { x, z } = shop;
+    for (const c of shopColliders(shop)) {
+      const hit = MeshBuilder.CreateBox(
+        'shopHit',
+        { width: c.w, height: 2.4, depth: c.d },
+        this.scene,
+      );
+      hit.position.set(c.cx, 1.2, c.cz);
+      hit.isVisible = false;
+      hit.physicsImpostor = new PhysicsImpostor(
+        hit,
+        PhysicsImpostor.BoxImpostor,
+        { mass: 0 },
+        this.scene,
+      );
+    }
 
-    const root = new TransformNode('martaShopRoot', this.scene);
+    const root = new TransformNode('shopRoot', this.scene);
     root.position.set(x, 0, z);
+    const { width, depth } = SHOP_BUILDING;
     const prims: Mesh[] = [];
-
-    const base = MeshBuilder.CreateBox(
-      'martaShopBase',
-      { width: 4.4, height: 3, depth: 4.4 },
-      this.scene,
-    );
+    const base = MeshBuilder.CreateBox('shopBase', { width, height: 3, depth }, this.scene);
     base.parent = root;
     base.position.y = 1.5;
-    base.material = this.mat(0.85, 0.55, 0.65);
-    base.receiveShadows = true;
-    this.addShadow(base);
+    base.material = this.mat(0.93, 0.87, 0.74);
     prims.push(base);
-
     const roof = MeshBuilder.CreateCylinder(
-      'martaShopRoof',
-      { diameterTop: 0, diameterBottom: 6.2, height: 2.2, tessellation: 4 },
+      'shopRoof',
+      { diameterTop: 0, diameterBottom: 8.4, height: 2, tessellation: 4 },
       this.scene,
     );
     roof.parent = root;
-    roof.position.y = 4.1;
+    roof.position.y = 4;
     roof.rotation.y = Math.PI / 4;
-    roof.material = this.mat(0.55, 0.22, 0.18);
-    this.addShadow(roof);
+    roof.material = this.mat(0.68, 0.29, 0.2);
     prims.push(roof);
+    for (const p of prims) this.addShadow(p);
 
-    const door = MeshBuilder.CreateBox(
-      'martaShopDoor',
-      { width: 1, height: 1.8, depth: 0.15 },
-      this.scene,
-    );
-    door.parent = root;
-    door.position.set(0, 0.9, 2.25);
-    door.material = this.mat(0.35, 0.22, 0.1);
-    prims.push(door);
-
-    const counter = MeshBuilder.CreateBox(
-      'martaShopCounter',
-      { width: 2.6, height: 1, depth: 1 },
-      this.scene,
-    );
-    counter.parent = root;
-    counter.position.set(-1, 0.5, 3);
-    counter.material = this.mat(0.55, 0.35, 0.18);
-    this.addShadow(counter);
-    prims.push(counter);
-
-    this._loadMartaShop(root, prims);
+    const sign = this.paintSign(shop.sign, SHOP_BUILDING.signWidth, SHOP_BUILDING.signHeight);
+    sign.position.set(x, SHOP_BUILDING.signY, z + SHOP_BUILDING.signZ + 0.005);
+    void this._loadShop(root, shop.exterior, prims);
   }
 
-  private async _loadMartaShop(root: TransformNode, prims: Mesh[]): Promise<void> {
+  private async _loadShop(root: TransformNode, file: string, prims: Mesh[]): Promise<void> {
     try {
-      const res = await SceneLoader.ImportMeshAsync('', '/models/', 'tienda_marta.glb', this.scene);
-      const model = res.meshes[0];
-      const { min, max } = model.getHierarchyBoundingVectors(true);
-      const escala = 4.8 / (max.y - min.y);
-      model.parent = root;
-      model.scaling = new Vector3(escala, escala, escala);
-      model.position.y = -min.y * escala;
-      for (const mesh of res.meshes) {
-        if (mesh.getTotalVertices() > 0) this.addShadow(mesh);
+      const res = await SceneLoader.ImportMeshAsync('', '/models/', file, this.scene);
+      res.meshes[0].parent = root; // en metros: sin reescalar
+      for (const m of res.meshes) {
+        if (m.getTotalVertices() === 0) continue;
+        m.receiveShadows = true;
+        this.addShadow(m);
+        if (m.material instanceof PBRMaterial && m.material.name === 'M_Farol') {
+          this.nightGlow.push({ mat: m.material, r: 1, g: 0.72, b: 0.35 });
+        }
       }
-      for (const prim of prims) prim.dispose();
+      for (const p of prims) {
+        this.shadow?.removeShadowCaster(p);
+        p.dispose();
+      }
     } catch {
-      // Fallback: la casa y el mostrador de primitivas permanecen visibles.
+      // fallback: se queda la casa de primitivas
     }
+  }
+
+  // Plano con un texto pintado en madera, de cara a +z (hacia la cámara).
+  paintSign(text: string, width: number, height: number): Mesh {
+    const px = 512;
+    const tex = new DynamicTexture(
+      'letreroTex',
+      { width: px, height: Math.round((px * height) / width) },
+      this.scene,
+      true,
+    );
+    const size = tex.getSize();
+    const ctx = tex.getContext() as CanvasRenderingContext2D;
+    ctx.fillStyle = '#c99a62';
+    ctx.fillRect(0, 0, size.width, size.height);
+    ctx.fillStyle = '#3a2614';
+    ctx.font = `bold ${Math.round(size.height * 0.58)}px sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(text, size.width / 2, size.height * 0.54);
+    tex.update();
+    const mat = new StandardMaterial('letreroMat', this.scene);
+    mat.diffuseTexture = tex;
+    mat.specularColor = Color3.Black();
+    const sign = MeshBuilder.CreatePlane('letrero', { width, height }, this.scene);
+    sign.rotation.y = Math.PI; // la cara del plano (-z local) pasa a mirar a +z
+    sign.material = mat;
+    return sign;
   }
 
   // Almacén del granjero: modelo GLB (assets/almacen.glb, publicado en

@@ -25,6 +25,7 @@ import {
   WELL,
   type Rect,
 } from './farmLayout';
+import { MARKET_ZONE } from './marketLayout';
 import { STORAGE } from './warehouse';
 import type { WorldView } from './worldView';
 
@@ -52,7 +53,7 @@ const CLEAR_ZONES: Rect[] = [
   { minX: -14.5, maxX: -7.5, minZ: -8.5, maxZ: -2.5 }, // ruta de Gon
   { minX: -0.5, maxX: 8.5, minZ: -22.5, maxZ: -13.5 }, // casa de Lila
   { minX: -4, maxX: 4.5, minZ: -17.5, maxZ: -10.5 }, // jardín y ruta de Lila
-  { minX: 7.5, maxX: 16.5, minZ: -12.5, maxZ: -3.5 }, // tienda de Marta
+  MARKET_ZONE, // tienda de Marta y puestos del mercado
   { minX: -2, maxX: 1.7, minZ: FARM_ENTRANCE.z1 - 1, maxZ: FARM_ENTRANCE.z2 + 1 }, // ante la entrada
   around(ENTRANCE_PATH.minX, ENTRANCE_PATH.maxX, ENTRANCE_PATH.minZ, ENTRANCE_PATH.maxZ, 0.4),
   ...Object.values(PENS).map((p) => around(p.x1, p.x2, p.z1, p.z2, 0.8)),

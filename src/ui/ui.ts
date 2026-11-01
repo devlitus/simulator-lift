@@ -10,9 +10,15 @@ import type { WorldView } from '../world/worldView';
 import type { QuestSystem, Quest } from '../quests/questSystem';
 import type { Economy } from '../economy/economy';
 import type { AnimalLogic } from '../animals/animalLogic';
-import type { AnimalDef, CropDef, FeedDef, GiftDef } from '../../data/schemas';
+import type { AnimalDef, CropDef, FeedDef, GiftDef, ShopKind } from '../../data/schemas';
 import { WATERING_CAN_CAPACITY } from '../../data/farm';
 import type { DialogButton } from '../core/types';
+
+const SHOP_TITLES: Record<ShopKind, string> = {
+  semillas: '🌱 Tienda de semillas de Marta',
+  animales: '🐄 Rancho de Tomás — animales y pienso',
+  flores: '🌸 Floristería de Lila — flores y regalos',
+};
 
 // Los elementos del HUD existen siempre en index.html: el ! es seguro aquí
 const $ = (id: string): HTMLElement => document.getElementById(id)!;
@@ -67,6 +73,7 @@ export class GameUI {
       dialogText: $('dialog-text'),
       dialogButtons: $('dialog-buttons'),
       shop: $('shop'),
+      shopTitle: $('shop-title'),
       shopMoney: $('shop-money'),
       shopItems: $('shop-items'),
       shopClose: $('shop-close'),
@@ -262,7 +269,12 @@ export class GameUI {
 
   // ---------- Tienda ----------
 
-  openShop(): void {
+  // Qué tienda está abierta: cada una vende lo suyo (ver renderShop)
+  shopKind: ShopKind = 'semillas';
+
+  openShop(kind: ShopKind): void {
+    this.shopKind = kind;
+    this.el.shopTitle.textContent = SHOP_TITLES[kind];
     this.el.dialog.classList.add('hidden');
     this.renderShop();
     this.el.shop.classList.remove('hidden');
@@ -277,50 +289,56 @@ export class GameUI {
     this.el.shopMoney.textContent = `Tus monedas: 🪙 ${s.money}`;
     const rows: HTMLElement[] = [];
 
-    for (const key of Object.keys(this.crops)) {
-      const c = this.crops[key];
-      rows.push(
-        this.shopRow(
-          `${c.icon} Semilla de ${c.name} — crece en ${c.daysToGrow} días, se vende a ${c.sellPrice}🪙`,
-          `${c.seedPrice} 🪙`,
-          `tienes ${s.seeds[key]}`,
-          s.money >= c.seedPrice,
-          () => this.economy.buySeed(key),
-        ),
-      );
+    if (this.shopKind === 'semillas') {
+      for (const key of Object.keys(this.crops)) {
+        const c = this.crops[key];
+        rows.push(
+          this.shopRow(
+            `${c.icon} Semilla de ${c.name} — crece en ${c.daysToGrow} días, se vende a ${c.sellPrice}🪙`,
+            `${c.seedPrice} 🪙`,
+            `tienes ${s.seeds[key]}`,
+            s.money >= c.seedPrice,
+            () => this.economy.buySeed(key),
+          ),
+        );
+      }
     }
-    for (const key of Object.keys(this.gifts)) {
-      const g = this.gifts[key];
-      rows.push(
-        this.shopRow(
-          `${g.icon} ${g.name} — regalo (+${g.points}❤️ de amistad)`,
-          `${g.price} 🪙`,
-          `tienes ${s.gifts[key]}`,
-          s.money >= g.price,
-          () => this.economy.buyGift(key),
-        ),
-      );
+    if (this.shopKind === 'flores') {
+      for (const key of Object.keys(this.gifts)) {
+        const g = this.gifts[key];
+        rows.push(
+          this.shopRow(
+            `${g.icon} ${g.name} — regalo (+${g.points}❤️ de amistad)`,
+            `${g.price} 🪙`,
+            `tienes ${s.gifts[key]}`,
+            s.money >= g.price,
+            () => this.economy.buyGift(key),
+          ),
+        );
+      }
     }
-    rows.push(
-      this.shopRow(
-        `${this.feedDef.icon} ${this.feedDef.name} — alimenta a 1 animal durante 1 día`,
-        `${this.feedDef.price} 🪙`,
-        `tienes ${s.feed}`,
-        s.money >= this.feedDef.price,
-        () => this.economy.buyFeed(),
-      ),
-    );
-    for (const key of Object.keys(this.animals)) {
-      const a = this.animals[key];
+    if (this.shopKind === 'animales') {
       rows.push(
         this.shopRow(
-          `${a.icon} ${a.name} — si la alimentas, deja ${a.productName} (${a.productPrice}🪙) cada día`,
-          `${a.price} 🪙`,
-          `tienes ${this.animalLogic.countOf(key)}`,
-          s.money >= a.price,
-          () => this.animalLogic.buyAnimal(key),
+          `${this.feedDef.icon} ${this.feedDef.name} — alimenta a 1 animal durante 1 día`,
+          `${this.feedDef.price} 🪙`,
+          `tienes ${s.feed}`,
+          s.money >= this.feedDef.price,
+          () => this.economy.buyFeed(),
         ),
       );
+      for (const key of Object.keys(this.animals)) {
+        const a = this.animals[key];
+        rows.push(
+          this.shopRow(
+            `${a.icon} ${a.name} — si la alimentas, deja ${a.productName} (${a.productPrice}🪙) cada día`,
+            `${a.price} 🪙`,
+            `tienes ${this.animalLogic.countOf(key)}`,
+            s.money >= a.price,
+            () => this.animalLogic.buyAnimal(key),
+          ),
+        );
+      }
     }
 
     this.el.shopItems.innerHTML = '';
