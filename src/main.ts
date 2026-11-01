@@ -31,6 +31,7 @@ import { FARM_CONFIG, WATERING_CAN_CAPACITY } from '../data/farm';
 import { ANIMALS, ANIMAL_FEED, PENS } from '../data/animals';
 import { GIFTS } from '../data/gifts';
 import { NPC_DEFS } from '../data/npcs';
+import { VILLAGERS } from '../data/villagers';
 import { QUEST_DEFS } from '../data/quests';
 
 import { WorldView } from './world/worldView';
@@ -84,6 +85,7 @@ import { AnimalView } from './animals/animalView';
 import { Economy } from './economy/economy';
 import { Friendship } from './npcs/friendship';
 import { NPCSystemView } from './npcs/npcView';
+import { VillagerView } from './npcs/villagerView';
 import { QuestSystem } from './quests/questSystem';
 import { GameUI } from './ui/ui';
 
@@ -153,6 +155,7 @@ const ui = new GameUI(
   ANIMAL_FEED,
 );
 const npcs = new NPCSystemView(scene, world, state, ui, quests, friendship, NPC_DEFS, CROPS);
+const villagers = new VillagerView(scene, world, ui, VILLAGERS);
 const saveRepo = new SaveRepository(window.localStorage);
 
 // Distancia al punto de la manivela para poder girarla (el pozo, con su
@@ -366,6 +369,9 @@ function findInteraction(): Interaction | null {
 
   const n = npcs.getInteraction(p);
   if (n) candidates.push(n);
+
+  const v = villagers.getInteraction(p);
+  if (v) candidates.push(v);
 
   // Tiendas del mercado: se entra por su puerta; dentro se compra al tendero
   const tienda = shopAtDoor(p.x, p.z);
@@ -584,6 +590,7 @@ engine.runRenderLoop(() => {
   const canMove = !ui.modalOpen && !player.busy;
   player.update(dt, keys, canMove);
   npcs.update(dt);
+  villagers.update(dt, player.position);
   animalView.update(dt);
   updateCamera(dt);
 

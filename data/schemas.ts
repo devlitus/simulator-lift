@@ -58,6 +58,32 @@ export type NpcDef = z.infer<typeof NpcSchema>;
 export type ShopKind = NonNullable<NpcDef['shop']>;
 export const NpcsSchema = z.array(NpcSchema);
 
+/**
+ * Transeúntes: vecinos de ambiente que pasean por los caminos del pueblo.
+ * No tienen amistad, misiones ni tienda; solo saludan.
+ */
+const Rgb = z.tuple([z.number(), z.number(), z.number()]);
+export const VillagerSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  look: z.object({
+    skin: Rgb,
+    shirt: Rgb,
+    pants: Rgb,
+    hair: Rgb,
+    hat: z.enum(['ninguno', 'sombrero', 'gorra', 'panuelo', 'mono']), // moño = pelo recogido
+    hatColor: Rgb,
+    height: z.number().min(0.7).max(1.2), // escala sobre la altura base (~1,5 m)
+    build: z.number().min(0.8).max(1.3), // anchura de hombros y tronco
+  }),
+  speed: z.number().positive(), // m/s
+  pause: z.number().min(0), // segundos parado en cada punto de la ruta
+  route: z.array(z.tuple([z.number(), z.number()])).min(2), // circuito cerrado
+  greetings: z.array(z.string()).min(1),
+});
+export type VillagerDef = z.infer<typeof VillagerSchema>;
+export const VillagersSchema = z.array(VillagerSchema);
+
 export const FriendshipLevelSchema = z.object({
   min: z.number().int().min(0),
   label: z.string(),

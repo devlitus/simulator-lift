@@ -231,6 +231,13 @@ Contenido binario del juego: modelos `.glb`, texturas y audio.
   planos en `COLOR_0` y las piezas de las tiendas. Fuente
   `assets/casas_vecinos.blend`; script, métricas y preview en
   [`assets/casas_vecinos/`](casas_vecinos/README.md).
+- `models/transeunte_<id>.glb` — los diez transeúntes que pasean por el
+  pueblo (`data/villagers.ts`): chibis modelados por script en Blender a
+  partir de una referencia de ComfyUI (Z-Image-Turbo) por personaje, con
+  colores planos en `COLOR_0`, rig de 7 huesos con pesos rígidos y
+  animaciones `walk` e `idle` como pistas NLA. Cara hacia -Y de Blender
+  (+Z en Babylon). Fuente `assets/transeuntes.blend`; referencias, scripts,
+  métricas y preview en [`assets/transeuntes/`](transeuntes/README.md).
 - `puesto_ventas.glb` — modelo 3D del puesto de ventas del granjero generado
   con Hunyuan3D-2 (servidor local, imagen→3D con textura 2048×2048) a partir
   de `assets/puesto_ventas_referencia.png` (imagen generada con ComfyUI en
