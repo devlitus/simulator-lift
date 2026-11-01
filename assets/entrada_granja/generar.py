@@ -160,15 +160,14 @@ def viga_y_tejado(m):
 
 
 def letrero(m):
-    """Letrero sobre la cumbrera, de cara a los lados: el juego le pinta el nombre encima.
-
-    Bajo el tejadillo no se vería con la cámara del juego, que mira desde arriba.
+    """Letrero sobre la cumbrera, en el plano del arco y de cara al exterior (-Y), hacia
+    la calle: el juego le pinta el nombre encima.
     """
     z = LETRERO_Z
-    for y in (-0.5, 0.5):
-        m.caja((0, y, z - 0.36), (0.06, 0.06, 0.34), variar(VIGA))
-    m.caja((0, 0, z), (0.07, 1.5, 0.62), variar(VIGA, 0.03))
-    m.caja((0, 0, z), (0.1, 1.38, 0.5), variar(TABLA, 0.03))
+    for x in (-0.5, 0.5):
+        m.caja((x, 0, z - 0.36), (0.06, 0.06, 0.34), variar(VIGA))
+    m.caja((0, 0, z), (1.5, 0.07, 0.62), variar(VIGA, 0.03))
+    m.caja((0, 0, z), (1.38, 0.1, 0.5), variar(TABLA, 0.03))
 
 
 def hoja(m, x):

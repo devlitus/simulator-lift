@@ -30,11 +30,11 @@ Medida sobre la captura, corrigiendo la perspectiva de la cámara.
 - La granja se valla entera con un único paso, un arco de madera (`assets/entrada_granja/`)
   al que llega la calle, prolongada para cruzarlo. Donde hay un cercado, su valla hace de
   valla de la granja, sin duplicarla.
-- El letrero va sobre la cumbrera, perpendicular al arco, para que su nombre mire a la
-  cámara: bajo el tejadillo quedaría tapado y de frente al arco apenas se leería.
+- El letrero va sobre la cumbrera, en el plano del arco y de cara a la calle, para que lo
+  vea quien llega por ella.
 - La casa se gira para que su puerta y su porche miren al oeste, hacia la entrada.
-- El mostrador del puesto de ventas mira al este, hacia el interior: al oeste y al sur
-  tiene la valla.
+- El mostrador del puesto de ventas mira al norte, hacia el camino de la entrada: al
+  oeste y al sur tiene la valla.
 - Un cercado por especie en lugar del recinto común: `PENS` sustituye a `PEN` y cada
   animal pasea solo por el suyo. Comparten valla y la puerta da al sur, porque al norte
   está el camino y a los lados, otro cercado.

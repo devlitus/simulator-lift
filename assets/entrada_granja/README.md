@@ -31,7 +31,7 @@ exterior en -Y.
 `WorldView.buildFarmEntrance` lo coloca sin reescalar en la valla oeste de la granja,
 con el exterior hacia la calle. Las colisiones están en `src/world/farmLayout.ts`
 (`FARM_ENTRANCE_SOLIDS`), así que **si mueves una pieza aquí, actualiza también ese
-archivo**. El juego pinta el nombre sobre el letrero, que mira a la cámara. Sin el GLB
+archivo**. El juego pinta el nombre sobre el letrero, que mira a la calle. Sin el GLB
 quedan dos postes y una viga de primitivas, con las mismas colisiones.
 
 ## Reproducir desde la raíz del repositorio
