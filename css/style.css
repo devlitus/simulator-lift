@@ -65,6 +65,40 @@ body {
   background: rgba(255, 255, 255, 0.25);
 }
 
+/* Energía del granjero */
+#hud-energy {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+#hud-energy .energy-bar {
+  width: 90px;
+  height: 10px;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  overflow: hidden;
+}
+#hud-energy-fill {
+  display: block;
+  height: 100%;
+  width: 100%;
+  background: #6fcf5a;
+  transition:
+    width 0.25s ease,
+    background-color 0.25s ease;
+}
+#hud-energy[data-level='media'] #hud-energy-fill {
+  background: #e8b53a;
+}
+#hud-energy[data-level='baja'] #hud-energy-fill {
+  background: #e0533c;
+}
+#hud-energy-text {
+  font-size: 13px;
+  min-width: 52px;
+}
+
 /* ---------- Panel de misiones ---------- */
 #quest-panel {
   position: fixed;

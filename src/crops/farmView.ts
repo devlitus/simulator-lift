@@ -5,7 +5,7 @@ import { EVENTS, EventBus } from '../core/events';
 import { CONFIG } from '../core/constants';
 import { TILE_STATUS, FarmLogic, type TileStatus } from './farmLogic';
 import type { GameState } from '../core/store';
-import type { CropDef, FarmConfig } from '../../data/schemas';
+import type { CropDef, FarmAction, FarmConfig } from '../../data/schemas';
 import type { Interaction } from '../core/types';
 import { SceneLoader } from '@babylonjs/core/Loading/sceneLoader';
 import { PBRMaterial } from '@babylonjs/core/Materials/PBR/pbrMaterial';
@@ -259,7 +259,26 @@ export class FarmView {
     return best;
   }
 
+  // Las labores muestran su coste de energía; sin energía la pista lo dice y no
+  // hay acción (dormir la recupera).
   describe(i: number): { label: string; action: (() => void) | null } {
+    const d = this.describeTile(i);
+    if (!d.labor || !d.action) return d;
+    const cost = this.logic.energyCost(d.labor);
+    if (!this.logic.canAfford(d.labor)) {
+      return {
+        label: `😩 Estás agotado (${d.label.replace(/^E: /, '')}) — duerme para recuperarte`,
+        action: null,
+      };
+    }
+    return { label: cost > 0 ? `${d.label} · ⚡${cost}` : d.label, action: d.action };
+  }
+
+  private describeTile(i: number): {
+    label: string;
+    action: (() => void) | null;
+    labor?: FarmAction;
+  } {
     const s = this.state;
     const status = this.logic.status(i);
     switch (status.kind) {
@@ -270,6 +289,7 @@ export class FarmView {
           return {
             label: `E: Plantar ${this.crops[seed].icon} ${this.crops[seed].name} (${n} semillas)`,
             action: () => this.logic.plant(i, seed),
+            labor: 'plant',
           };
         }
         return {
@@ -279,13 +299,18 @@ export class FarmView {
       }
       case TILE_STATUS.WITHERED: {
         const def = this.crops[status.crop!.type];
-        return { label: `E: Limpiar ${def.name} marchita`, action: () => this.logic.clear(i) };
+        return {
+          label: `E: Limpiar ${def.name} marchita`,
+          action: () => this.logic.clear(i),
+          labor: 'clear',
+        };
       }
       case TILE_STATUS.MATURE: {
         const def = this.crops[status.crop!.type];
         return {
           label: `E: Cosechar ${def.icon} ${def.name}`,
           action: () => this.logic.harvest(i),
+          labor: 'harvest',
         };
       }
       default: {
@@ -301,6 +326,7 @@ export class FarmView {
           return {
             label: `E: Regar ${def.name} (${c.stage}/${def.daysToGrow}) · 💧 ${this.state.water}`,
             action: () => this.logic.water(i),
+            labor: 'water',
           };
         }
         return {

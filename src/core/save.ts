@@ -40,6 +40,7 @@ export const SaveSchema = z.object({
   day: z.number().optional(),
   weather: z.enum(['sol', 'nublado', 'lluvia', 'nieve']).optional(),
   money: z.number().optional(),
+  energy: z.number().optional(),
   seeds: z.record(z.number()).optional(),
   produce: z.record(z.number()).optional(),
   gifts: z.record(z.number()).optional(),
@@ -79,6 +80,7 @@ export function buildSave(
     day: state.day,
     weather: state.weather,
     money: state.money,
+    energy: state.energy,
     seeds: { ...state.seeds },
     produce: { ...state.produce },
     gifts: { ...state.gifts },
@@ -107,6 +109,7 @@ export function applySave(
   state.season = seasonOf(state.day, SEASONS).id; // derivada: nunca se guarda
   state.weather = d.weather ?? state.weather; // saves antiguos: se queda el actual
   state.money = d.money ?? state.money;
+  state.energy = d.energy ?? state.energy; // saves antiguos: energía llena
   Object.assign(state.seeds, d.seeds || {});
   Object.assign(state.produce, d.produce || {});
   Object.assign(state.gifts, d.gifts || {});

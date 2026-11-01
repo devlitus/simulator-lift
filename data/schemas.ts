@@ -117,12 +117,34 @@ export const FriendshipLevelSchema = z.object({
 export type FriendshipLevel = z.infer<typeof FriendshipLevelSchema>;
 export const FriendshipLevelsSchema = z.array(FriendshipLevelSchema).min(1);
 
+// Energía del granjero: las labores la gastan y dormir la recupera. Quien sigue
+// despierto a la hora del desmayo cae rendido, despierta en casa con menos
+// energía y paga por que lo lleven.
+export const EnergyConfigSchema = z.object({
+  max: z.number().int().positive(),
+  costs: z.object({
+    plant: z.number().int().min(0),
+    water: z.number().int().min(0),
+    harvest: z.number().int().min(0),
+    clear: z.number().int().min(0),
+  }), // energía que gasta cada labor de la granja
+  lowWarning: z.number().min(0).max(1), // fracción del máximo a la que se avisa de cansancio
+  passOutHour: z.number().min(0).lt(6), // de madrugada, antes del amanecer
+  faintEnergy: z.number().min(0).max(1), // fracción del máximo con la que se despierta tras desmayarse
+  faintMoneyLoss: z.number().min(0).max(1), // fracción del dinero que se pierde al desmayarse
+  faintMaxLoss: z.number().int().min(0), // tope de lo que se pierde
+});
+export type EnergyConfig = z.infer<typeof EnergyConfigSchema>;
+/** Labores de la granja que cansan al granjero. */
+export type FarmAction = keyof EnergyConfig['costs'];
+
 export const BalanceSchema = z.object({
   startMoney: z.number().int().min(0),
   startSeeds: z.record(z.number().int().min(0)), // semillas iniciales por tipo de cultivo
   startFeed: z.number().int().min(0), // pienso inicial
   startAnimals: z.array(z.string()), // especies con las que empieza el jugador
   sleepFromHour: z.number().min(6).max(24), // desde qué hora se puede dormir en casa
+  energy: EnergyConfigSchema,
 });
 export type BalanceConfig = z.infer<typeof BalanceSchema>;
 

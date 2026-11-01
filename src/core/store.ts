@@ -24,6 +24,8 @@ export interface GameState {
   /** clima de hoy (se tira al empezar cada día) */
   weather: WeatherKind;
   money: number;
+  /** energía del granjero: la gastan las labores, la recupera dormir */
+  energy: number;
   seeds: Record<string, number>;
   produce: Record<string, number>;
   gifts: Record<string, number>;
@@ -64,6 +66,7 @@ export function createInitialState(
     season: seasonOf(1, SEASONS).id,
     weather: 'sol', // el primer día de partida siempre hace bueno
     money: balance.startMoney,
+    energy: balance.energy.max,
     seeds,
     produce,
     gifts,

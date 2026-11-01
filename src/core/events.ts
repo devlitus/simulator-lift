@@ -15,6 +15,7 @@ export const EVENTS = {
   ANIMALS_CHANGED: 'animals:changed', // los animales cambiaron (compra, comida, carga)
   INVENTORY_CHANGED: 'inventory:changed', // semillas/cosecha/regalos cambiaron
   MONEY_CHANGED: 'money:changed',
+  ENERGY_CHANGED: 'energy:changed', // el granjero gastó o recuperó energía
   FRIENDSHIP_ADD: 'friendship:add', // petición de sumar puntos
   FRIENDSHIP_CHANGED: 'friendship:changed',
   NPC_TALKED: 'npc:talked', // primera charla del día
@@ -34,6 +35,7 @@ export type EventPayloads = {
   'animals:changed': void;
   'inventory:changed': void;
   'money:changed': void;
+  'energy:changed': void;
   'friendship:add': { npcId: string; pts: number };
   'friendship:changed': { npcId: string; points: number; leveledUp: boolean; levelLabel: string };
   'npc:talked': { npcId: string };

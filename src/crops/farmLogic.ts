@@ -1,10 +1,12 @@
 // FarmLogic (dominio puro, SIN Babylon): reglas de la granja.
 // Plantar, regar, crecimiento por días, marchitez y cosecha sobre datos planos.
 // Cada cultivo solo se planta y crece en sus estaciones; la lluvia riega sola.
+// Las labores (plantar, regar, cosechar, limpiar) cansan: si se le inyecta un
+// medidor de energía, sin energía suficiente no se hacen.
 // No crea meshes: la vista (src/crops/farmView.ts) refleja este estado.
 import { EVENTS, EventBus } from '../core/events';
 import { WATERING_CAN_CAPACITY, WILT_DAYS } from '../../data/farm';
-import type { CropDef, SeasonId } from '../../data/schemas';
+import type { CropDef, FarmAction, SeasonId } from '../../data/schemas';
 import { inSeason } from '../calendar/calendar';
 
 export interface TileCrop {
@@ -40,22 +42,48 @@ export interface FarmState {
   season?: SeasonId; // sin estación (tests antiguos) no hay reglas de temporada
 }
 
+// Contrato mínimo que FarmLogic necesita del medidor de energía (player/energy.ts).
+export interface FarmEnergy {
+  cost(action: FarmAction): number;
+  canAfford(action: FarmAction): boolean;
+  spend(action: FarmAction): boolean;
+}
+
 export class FarmLogic {
   state: FarmState;
   bus: EventBus;
   crops: Record<string, CropDef>;
   tiles: Array<TileCrop | null>;
+  energy: FarmEnergy | null; // sin medidor (tests antiguos) las labores no cansan
 
   constructor(
     state: FarmState,
     bus: EventBus,
     cropsData: Record<string, CropDef>,
     tileCount: number,
+    energy: FarmEnergy | null = null,
   ) {
     this.state = state;
     this.bus = bus;
     this.crops = cropsData;
     this.tiles = new Array(tileCount).fill(null);
+    this.energy = energy;
+  }
+
+  /** Energía que gasta la labor (0 si no se mide la energía). */
+  energyCost(action: FarmAction): number {
+    return this.energy ? this.energy.cost(action) : 0;
+  }
+
+  /** Queda energía para la labor (o no se mide la energía). */
+  canAfford(action: FarmAction): boolean {
+    return !this.energy || this.energy.canAfford(action);
+  }
+
+  // Se llama tras validar la labor y antes de cambiar nada: si no hay energía
+  // la labor no se hace y el surco queda como estaba.
+  private tire(action: FarmAction): boolean {
+    return !this.energy || this.energy.spend(action);
   }
 
   status(index: number): TileStatus {
@@ -77,6 +105,7 @@ export class FarmLogic {
       this.bus.emit(EVENTS.NOTIFY, `📅 ${this.crops[type].name} no se planta en esta estación`);
       return false;
     }
+    if (!this.tire('plant')) return false;
     this.state.seeds[type]--;
     this.tiles[index] = { type, stage: 0, watered: false, wiltDays: 0, withered: false };
     this.bus.emit(EVENTS.FARM_CHANGED);
@@ -92,6 +121,7 @@ export class FarmLogic {
       this.bus.emit(EVENTS.NOTIFY, '🪣 La regadera está vacía: llénala en el pozo');
       return false;
     }
+    if (!this.tire('water')) return false;
     this.state.water--;
     c.watered = true;
     this.bus.emit(EVENTS.FARM_CHANGED);
@@ -151,7 +181,7 @@ export class FarmLogic {
   }
 
   clear(index: number): boolean {
-    if (!this.tiles[index]) return false;
+    if (!this.tiles[index] || !this.tire('clear')) return false;
     this.tiles[index] = null;
     this.bus.emit(EVENTS.FARM_CHANGED);
     this.bus.emit(EVENTS.NOTIFY, '🧹 Surco limpiado');
@@ -162,6 +192,7 @@ export class FarmLogic {
   harvest(index: number): string | null {
     const c = this.tiles[index];
     if (!c || c.withered || c.stage < this.crops[c.type].daysToGrow) return null;
+    if (!this.tire('harvest')) return null;
     const type = c.type;
     this.state.produce[type]++;
     this.tiles[index] = null;
