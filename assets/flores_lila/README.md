@@ -1,11 +1,13 @@
 # Flores del jardín de Lila
 
-Tres variantes estáticas low-poly creadas con el script reproducible
-`generar_modelos.py`: margarita, tulipán coral y lavanda. Cada una usa una
-textura raster de 8×8 píxeles de dos tonos, empaquetada dentro del GLB, para
-que no existan rutas de texturas externas durante la carga en Babylon.
+Cinco variantes estáticas low-poly: margarita, tulipán coral, lavanda, amapola
+roja y campanillas azules. Las
+referencias se generan con Z-Image-Turbo en la instancia ComfyUI nativa de
+WSL, con una ejecución por variedad y los workflows API guardados aquí.
 
-La referencia con ComfyUI no pudo generarse en esta sesión: la conexión WSL a
-la instancia Windows falla antes de abrir un puerto. El script deja fuentes
-Blender editables en `assets/flor_*.blend`, exporta los GLB fuente a
-`assets/models/` y copia los artefactos servidos a `public/models/`.
+Los GLB resultantes se limpian en Blender, se guardan como fuentes editables
+en `assets/flor_*.blend`, se exportan a `assets/models/` y se copian a
+`public/models/` para Babylon.
+
+`generar_modelos_hunyuan.py` usa Hunyuan3D-2mini local con eliminación de
+islas y caras degeneradas, límite de 12.000 caras y textura PBR embebida.

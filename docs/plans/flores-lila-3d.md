@@ -7,21 +7,22 @@ Estado: en implementación.
 
 Reemplazar las seis flores decorativas compuestas por cilindros y esferas del
 jardín de Lila por modelos GLB texturizados de lectura clara desde la cámara
-isométrica. El conjunto tendrá tres variedades complementarias y distintas:
-margarita blanca con centro amarillo, tulipán coral y espiga de lavanda. Las
+isométrica. El conjunto tendrá cinco variedades complementarias y distintas:
+margarita blanca con centro amarillo, tulipán coral, espiga de lavanda,
+amapola roja y campanillas azules. Las
 formas serán estilizadas, low-poly y cálidas, coherentes con el pueblo.
 
 ## Alcance
 
 - Crear una referencia y un GLB con textura embebida para cada variedad.
 - Guardar sus fuentes editables y publicar copias en `public/models/`.
-- Alternar las tres variedades en las seis posiciones que ya existen.
+- Alternar las cinco variedades en las seis posiciones que ya existen.
 - Mantener las primitivas actuales como respaldo visual si falla una carga.
 - No cambiar posiciones, colisiones ni reglas de juego.
 
 ## Pasos
 
-1. Generar las referencias de las tres flores, una por imagen, con fondo liso,
+1. Generar las referencias de las cinco flores, una por imagen, con fondo liso,
    vista tres cuartos y sin elementos ajenos; registrar los prompts.
 2. Convertir cada referencia a GLB texturizado con Hunyuan3D-2, limpiar las
    mallas en Blender (soldar vértices antes de eliminar islas), orientar la
@@ -36,7 +37,7 @@ formas serán estilizadas, low-poly y cálidas, coherentes con el pueblo.
 
 ## Criterios de aceptación
 
-- El jardín alterna tres flores 3D texturizadas y visualmente distinguibles.
+- El jardín alterna cinco flores 3D texturizadas y visualmente distinguibles.
 - Cada modelo se sirve desde `/models/`, queda apoyado en el terreno y arroja
   sombras.
 - Una carga fallida deja visibles las flores de primitivas actuales.
