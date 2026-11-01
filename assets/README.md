@@ -200,6 +200,14 @@ Contenido binario del juego: modelos `.glb`, texturas y audio.
   referencia, workflow y script en [`assets/camino/`](camino/README.md).
   Las copias servidas están en `public/models/`.
 
+- `escenario.glb` — props del entorno modelados por script en Blender
+  (rocas con textura de ComfyUI, arbustos, matas de hierba, flores
+  silvestres, pinos, tramo de valla y colinas del horizonte). Junto con las
+  texturas `public/textures/cesped.jpg` y `variacion_suelo.jpg`
+  forma el escenario que coloca `SceneryView` con thin instances. Fuente
+  editable `assets/escenario.blend`; scripts, workflows y detalle en
+  [`assets/escenario/`](escenario/README.md).
+
 ## Cómo se publican los modelos
 
 Vite solo publica lo que hay en `public/`, así que los `.glb` que usa el juego
