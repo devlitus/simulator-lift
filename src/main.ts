@@ -49,7 +49,7 @@ import {
   shopInside,
 } from './world/marketLayout';
 import { ShopInteriorView } from './world/shopInteriorView';
-import { canSleep } from './world/sleep';
+import { canSleep, isPastMidnight, shouldPassOut } from './world/sleep';
 import { canEnterDoor, DOOR_SPOT } from './world/farmerPorch';
 import { HomeInteriorView } from './world/homeInteriorView';
 import {
@@ -81,6 +81,7 @@ import {
 import { WarehouseView } from './world/warehouseView';
 import { SceneryView } from './world/sceneryView';
 import { PlayerView } from './player/playerView';
+import { Energy } from './player/energy';
 import { FarmLogic } from './crops/farmLogic';
 import { FarmView } from './crops/farmView';
 import { AnimalLogic } from './animals/animalLogic';
@@ -115,7 +116,8 @@ const bus = new EventBus();
 const state = createInitialState(BALANCE, CROPS, GIFTS, NPC_DEFS, ANIMALS);
 
 // ---------- Sistemas de dominio (sin Babylon) ----------
-const farmLogic = new FarmLogic(state, bus, CROPS, FARM_CONFIG.cols * FARM_CONFIG.rows);
+const energy = new Energy(state, bus, BALANCE.energy);
+const farmLogic = new FarmLogic(state, bus, CROPS, FARM_CONFIG.cols * FARM_CONFIG.rows, energy);
 const animalLogic = new AnimalLogic(state, bus, ANIMALS, BALANCE.startAnimals);
 const economy = new Economy(state, bus, CROPS, GIFTS, ANIMALS, ANIMAL_FEED);
 const friendship = new Friendship(state, bus, NPC_DEFS);
@@ -352,18 +354,63 @@ function moveThroughDoor(x: number, z: number, heading: number): void {
 }
 
 // Fundido a negro; con la pantalla a oscuras empieza el día siguiente y el
-// granjero despierta junto a la cama.
+// granjero despierta junto a la cama. La energía se repone antes del día
+// nuevo para que el autoguardado de DAY_NEW ya la recoja.
 function sleep(): void {
   ui.fadeToBlack(() => {
+    energy.rest();
     world.sleep(state.day);
     player.teleport(BED_WAKE.x, BED_WAKE.z);
   });
+}
+
+// Desmayo: a la hora límite el granjero cae rendido donde esté, despierta en
+// casa con media energía y le cobran por llevarlo. Igual que dormir, salta al
+// amanecer siguiente.
+let fainting = false;
+let lateWarned = false; // ya se avisó esta noche de que es medianoche
+
+function passOut(): void {
+  fainting = true;
+  ui.closeModals();
+  bus.emit(EVENTS.NOTIFY, '😵 Te caes rendido de sueño…');
+  ui.fadeToBlack(() => {
+    const loss = energy.faint();
+    world.sleep(state.day);
+    player.teleport(BED_WAKE.x, BED_WAKE.z);
+    const foco = interiorViewAt(BED_WAKE.x, BED_WAKE.z) ?? BED_WAKE;
+    camFree = false;
+    camTarget.x = foco.x;
+    camTarget.z = foco.z;
+    bus.emit(
+      EVENTS.NOTIFY,
+      loss > 0
+        ? `🚑 Te llevaron a casa de madrugada: pagaste ${loss} 🪙 y despiertas cansado`
+        : '🚑 Te llevaron a casa de madrugada y despiertas cansado',
+    );
+    fainting = false;
+  }, 1200);
+}
+
+function checkBedtime(): void {
+  if (fainting || ui.sleeping) return; // durante un fundido no se comprueba
+  const hour = world.getHour();
+  if (shouldPassOut(hour, BALANCE.energy.passOutHour)) {
+    passOut();
+  } else if (isPastMidnight(hour) && !lateWarned) {
+    lateWarned = true;
+    bus.emit(
+      EVENTS.NOTIFY,
+      `🌙 Es medianoche: vete a la cama antes de las ${BALANCE.energy.passOutHour}:00 o te desmayarás`,
+    );
+  }
 }
 
 // ---------- Ciclo de día nuevo ----------
 bus.on(EVENTS.DAY_NEW, ({ day }) => {
   const { season, seasonChanged, rain } = beginDay(state, day, SEASONS, Math.random);
   state.talkedToday = {};
+  lateWarned = false;
   farmLogic.newDay(); // crece lo regado ayer
   animalLogic.newDay();
   bus.emit(EVENTS.NOTIFY, `🌅 Comienza el día ${state.day}`);
@@ -613,6 +660,7 @@ engine.runRenderLoop(() => {
   camera.maxZ = world.indoors ? INDOORS_MAX_Z : OUTDOORS_MAX_Z;
   document.body.classList.toggle('indoors', world.indoors); // el CSS oculta el HUD de fuera
   world.update(dt, state.day);
+  checkBedtime();
   homeInterior.update(dt, world.daylight);
   warehouse.update(dt, world.daylight, isUnderLoft(px, pz, py));
 

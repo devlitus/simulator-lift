@@ -14,6 +14,7 @@ import type { AnimalDef, CropDef, FeedDef, GiftDef, ShopKind } from '../../data/
 import { WATERING_CAN_CAPACITY } from '../../data/farm';
 import type { DialogButton } from '../core/types';
 import { SEASONS } from '../../data/seasons';
+import { BALANCE } from '../../data/balance';
 import { dayOfSeason, seasonOf, WEATHER_INFO } from '../calendar/calendar';
 
 const SHOP_TITLES: Record<ShopKind, string> = {
@@ -66,6 +67,9 @@ export class GameUI {
       money: $('hud-money'),
       day: $('hud-day'),
       time: $('hud-time'),
+      energy: $('hud-energy'),
+      energyFill: $('hud-energy-fill'),
+      energyText: $('hud-energy-text'),
       questList: $('quest-list'),
       inventory: $('inventory'),
       hint: $('hint'),
@@ -131,6 +135,17 @@ export class GameUI {
       ` · ${WEATHER_INFO[weather].icon}`;
     this.el.day.title = WEATHER_INFO[weather].name;
     this.el.time.textContent = `🕒 ${this.world.getTimeString()}`;
+    this.renderEnergy();
+  }
+
+  // Barra de energía: verde → ámbar → rojo según lo que queda.
+  renderEnergy(): void {
+    const { energy } = this.state;
+    const max = BALANCE.energy.max;
+    const f = Math.max(0, Math.min(1, energy / max));
+    this.el.energyFill.style.width = `${f * 100}%`;
+    this.el.energy.dataset.level = f > 0.5 ? 'alta' : f > 0.2 ? 'media' : 'baja';
+    this.el.energyText.textContent = `${energy}/${max}`;
   }
 
   renderInventory(): void {

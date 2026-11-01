@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { EventBus, EVENTS } from '../core/events';
-import { FarmLogic, TILE_STATUS, type FarmState } from './farmLogic';
+import { FarmLogic, TILE_STATUS, type FarmEnergy, type FarmState } from './farmLogic';
 import { WATERING_CAN_CAPACITY, WILT_DAYS } from '../../data/farm';
 import type { CropDef } from '../../data/schemas';
 
@@ -184,5 +184,60 @@ describe('FarmLogic', () => {
     const farm2 = new FarmLogic(makeState(), bus2, CROPS, 4);
     farm2.deserialize(snapshot);
     expect(farm2.status(0).crop).toEqual(farm.status(0).crop);
+  });
+});
+
+describe('FarmLogic con energía', () => {
+  // Medidor mínimo: cada labor cuesta 1 y solo quedan `left` puntos
+  function makeEnergy(left: number): FarmEnergy & { left: number } {
+    return {
+      left,
+      cost: () => 1,
+      canAfford() {
+        return this.left >= 1;
+      },
+      spend() {
+        if (this.left < 1) return false;
+        this.left--;
+        return true;
+      },
+    };
+  }
+
+  it('cada labor gasta energía', () => {
+    const state = makeState();
+    const energy = makeEnergy(10);
+    const farm = new FarmLogic(state, new EventBus(), CROPS, 4, energy);
+    farm.plant(0, 'zanahoria');
+    farm.water(0);
+    farm.newDay();
+    farm.water(0);
+    farm.newDay();
+    expect(farm.harvest(0)).toBe('zanahoria');
+    expect(energy.left).toBe(6);
+  });
+
+  it('agotado no planta, ni riega, ni cosecha, ni limpia, y no cambia nada', () => {
+    const state = makeState();
+    const energy = makeEnergy(1);
+    const farm = new FarmLogic(state, new EventBus(), CROPS, 4, energy);
+    farm.plant(0, 'zanahoria'); // gasta la última energía
+    expect(farm.canAfford('plant')).toBe(false);
+    expect(farm.plant(1, 'zanahoria')).toBe(false);
+    expect(state.seeds.zanahoria).toBe(1);
+    expect(farm.water(0)).toBe(false);
+    expect(state.water).toBe(WATERING_CAN_CAPACITY);
+    expect(farm.status(0).crop!.watered).toBe(false);
+    expect(farm.clear(0)).toBe(false);
+    expect(farm.status(0).kind).toBe(TILE_STATUS.GROWING);
+  });
+
+  it('una labor inválida no gasta energía', () => {
+    const energy = makeEnergy(5);
+    const farm = new FarmLogic(makeState(), new EventBus(), CROPS, 4, energy);
+    expect(farm.water(0)).toBe(false); // surco vacío
+    expect(farm.harvest(0)).toBe(null);
+    expect(farm.clear(0)).toBe(false);
+    expect(energy.left).toBe(5);
   });
 });

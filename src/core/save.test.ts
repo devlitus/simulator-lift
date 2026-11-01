@@ -15,6 +15,7 @@ function makeState(): GameState {
     season: 'primavera',
     weather: 'lluvia',
     money: 120,
+    energy: 40,
     seeds: { zanahoria: 1 },
     produce: { zanahoria: 2 },
     gifts: { flor: 1 },
@@ -47,6 +48,7 @@ describe('buildSave / applySave', () => {
       day: 3,
       weather: 'lluvia',
       money: 120,
+      energy: 40,
       seeds: { zanahoria: 1 },
       produce: { zanahoria: 2 },
       feed: 2,
@@ -64,6 +66,7 @@ describe('buildSave / applySave', () => {
       season: 'primavera',
       weather: 'sol',
       money: 0,
+      energy: 100,
       seeds: {},
       produce: {},
       gifts: {},
@@ -78,6 +81,7 @@ describe('buildSave / applySave', () => {
       day: 9,
       weather: 'nublado',
       money: 200,
+      energy: 35,
       seeds: { tomate: 3 },
       produce: {},
       gifts: {},
@@ -103,6 +107,7 @@ describe('buildSave / applySave', () => {
     expect(state.season).toBe('verano'); // se deriva del día, no se lee del save
     expect(state.weather).toBe('nublado');
     expect(state.money).toBe(200);
+    expect(state.energy).toBe(35);
     expect(state.seeds).toEqual({ tomate: 3 });
     expect(state.feed).toBe(4);
     expect(state.water).toBe(1);
@@ -120,6 +125,7 @@ describe('buildSave / applySave', () => {
     expect(state.water).toBe(3); // saves sin regadera conservan el agua actual
     expect(state.animalProducts).toEqual({ oveja: 1 });
     expect(state.weather).toBe('lluvia'); // saves sin clima conservan el actual
+    expect(state.energy).toBe(40); // saves sin energía conservan la actual
   });
 
   it('rechaza un clima desconocido', () => {
