@@ -1,7 +1,7 @@
 # Escenario del pueblo
 
 Terreno y decoración del entorno: césped pintado, matas de hierba, flores
-silvestres, rocas, arbustos, valla en el borde del mapa, pinos y colinas en
+silvestres, rocas, arbustos, pinos y colinas en
 el horizonte. Sustituye al prado de color verde liso.
 
 ## Texturas (ComfyUI)
@@ -40,8 +40,7 @@ fuente editable `../escenario.blend`.
 | `Hierba_01/02` | 18 / 14 | Matas de briznas plegadas |
 | `Flores_Blanca/Amarilla/Malva` | 170 | Cinco tallos con corola y botón |
 | `Pino_01/02` | 56 | Tronco y tres pisos de copa |
-| `Valla_Tramo` | 36 | Poste + dos travesaños de 2 m, encadenables |
-| `Colinas` | 21.632 | 260×260 m, llano dentro del mapa, colinas fuera; UV a 4 m y color por vértice |
+| `Colinas` | 21.632 | Suelo visible de 260×260 m: llano dentro del mapa y colinas fuera; UV 0..1 sobre el mapa de 64 m y color por vértice (blanco en el llano) |
 
 Los colores se escriben en sRGB y el script los pasa a lineal (glTF). Cada
 prop tiene las transformaciones aplicadas y la base en el origen.
@@ -50,10 +49,14 @@ prop tiene las transformaciones aplicadas y la base en el origen.
 
 `src/world/sceneryView.ts` repite los props con thin instances (una
 llamada de dibujo por malla): matas de hierba (900 intentos), 34 corros
-de flores, 18 rocas, 22 arbustos, 128 tramos de valla y pinos apoyados
+de flores, 18 rocas, 22 arbustos y pinos apoyados
 sobre las colinas con un rayo. La colocación es determinista (mulberry32 con semilla) y
 evita caminos, parcela, edificios, recinto, rutas de los NPC y árboles.
-Los arbustos cambian el PBR del glTF por un `StandardMaterial` mate como el
+Las colinas son el suelo visible de todo el mundo: usan el material del
+terreno (césped + variación) y el terreno queda como superficie física
+invisible, así que no hay costura en el borde del mapa; si el GLB falla,
+el terreno vuelve a verse. Matas y flores se siembran hasta 6 m más allá
+del borde, a la altura de las colinas. Los arbustos cambian el PBR del glTF por un `StandardMaterial` mate como el
 resto de la escena (sin mapa de entorno el PBR sale blanquecino) y sin luz
 de doble cara, para respetar las normales esféricas de las hojas. Rocas
 grandes y arbustos tienen colisión propia, creada aunque falle el

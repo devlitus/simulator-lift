@@ -202,7 +202,7 @@ Contenido binario del juego: modelos `.glb`, texturas y audio.
 
 - `escenario.glb` — props del entorno modelados por script en Blender
   (rocas con textura de ComfyUI, arbustos, matas de hierba, flores
-  silvestres, pinos, tramo de valla y colinas del horizonte). Junto con las
+  silvestres, pinos y colinas del horizonte). Junto con las
   texturas `public/textures/cesped.jpg` y `variacion_suelo.jpg`
   forma el escenario que coloca `SceneryView` con thin instances. Fuente
   editable `assets/escenario.blend`; scripts, workflows y detalle en

@@ -64,6 +64,7 @@ export class WorldView {
   hemi: HemisphericLight;
   sun: DirectionalLight;
   shadow: ShadowGenerator | null;
+  ground!: Mesh; // superficie física; SceneryView la oculta al cargar las colinas
   pen: PenConfig;
   sellBin: { x: number; z: number };
   storageCut = false; // el granjero está dentro del almacén
@@ -140,6 +141,7 @@ export class WorldView {
     mat.ambientTexture = new Texture('/textures/variacion_suelo.jpg', this.scene);
     ground.material = mat;
     ground.receiveShadows = true;
+    this.ground = ground;
     ground.physicsImpostor = new PhysicsImpostor(
       ground,
       PhysicsImpostor.BoxImpostor,
