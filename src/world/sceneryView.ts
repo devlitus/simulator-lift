@@ -37,7 +37,7 @@ interface Placement {
   scale: number;
 }
 
-// Zonas donde no se siembra decoración: caminos, casas, jardín de Lila, rutas de
+// Zonas donde no se siembra decoración: caminos, casas, rutas de
 // los NPC (data/npcs.ts), el spawn y lo construido en la granja.
 const around = (x1: number, x2: number, z1: number, z2: number, margin: number): Rect => ({
   minX: x1 - margin,
@@ -51,8 +51,6 @@ const CLEAR_ZONES: Rect[] = [
   { minX: -16.6, maxX: 14.6, minZ: -5.7, maxZ: -2.3 }, // camino este-oeste
   { minX: -18.5, maxX: -9.5, minZ: -14.5, maxZ: -5.5 }, // casa de Gon
   { minX: -14.5, maxX: -7.5, minZ: -8.5, maxZ: -2.5 }, // ruta de Gon
-  { minX: -0.5, maxX: 8.5, minZ: -22.5, maxZ: -13.5 }, // casa de Lila
-  { minX: -4, maxX: 4.5, minZ: -17.5, maxZ: -10.5 }, // jardín y ruta de Lila
   MARKET_ZONE, // tienda de Marta y puestos del mercado
   { minX: -2, maxX: 1.7, minZ: FARM_ENTRANCE.z1 - 1, maxZ: FARM_ENTRANCE.z2 + 1 }, // ante la entrada
   around(ENTRANCE_PATH.minX, ENTRANCE_PATH.maxX, ENTRANCE_PATH.minZ, ENTRANCE_PATH.maxZ, 0.4),
