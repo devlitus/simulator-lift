@@ -3,7 +3,7 @@
 // juego propias: solo wiring e input.
 import { FreeCamera } from '@babylonjs/core/Cameras/freeCamera';
 import { Engine } from '@babylonjs/core/Engines/engine';
-import { Vector3 } from '@babylonjs/core/Maths/math.vector';
+import { Matrix, Vector3 } from '@babylonjs/core/Maths/math.vector';
 import { CannonJSPlugin } from '@babylonjs/core/Physics/v1/Plugins/cannonJSPlugin';
 import { Scene } from '@babylonjs/core/scene';
 // Babylon se importa por rutas para que Vite descarte lo que no se usa. Las
@@ -16,6 +16,7 @@ import '@babylonjs/core/Lights/Shadows/shadowGeneratorSceneComponent'; // sombra
 import '@babylonjs/core/Particles/particleSystemComponent'; // partículas (riego)
 import '@babylonjs/core/Animations/animatable'; // AnimationGroup.start
 import '@babylonjs/core/Meshes/thinInstanceMesh'; // thin instances (decorado)
+import '@babylonjs/core/Culling/ray'; // scene.createPickingRay (arrastrar el mapa)
 import * as CANNON from 'cannon';
 
 import { CONFIG } from './core/constants';
@@ -158,11 +159,21 @@ const WAREHOUSE_VIEW = { x: WAREHOUSE.x, z: WAREHOUSE.z + 0.6, zoom: 15 };
 // Vista aérea con orientación fija (pitch 45°, mirando hacia -z): la cámara
 // sigue al personaje centrada, con suavizado exponencial, y nunca gira.
 // La rueda del ratón ajusta el zoom (acercar/alejar manteniendo el ángulo).
+// Arrastrar con el botón izquierdo mueve el mapa y suelta al personaje; la
+// cámara vuelve a seguirlo cuando camina y se sale del encuadre.
 const camera = new FreeCamera('cam', new Vector3(0, 12, 24), scene);
 const OUTDOORS_MAX_Z = camera.maxZ;
 const camTarget = new Vector3(0, 0, 12); // punto de mira, arranca en el jugador
 const camLookAt = new Vector3(0, 1, 12); // scratch para setTarget
 let camZoom: number = CONFIG.camZoomStart;
+let camFree = false; // el jugador ha movido el mapa: la cámara no sigue al granjero
+let dragging = false;
+const MOVE_KEYS = ['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'];
+const VIEW_MARGIN = 0.1; // borde de pantalla que ya cuenta como fuera (lo tapa el HUD)
+const playerScreen = new Vector3(); // scratch para proyectar al granjero
+const dragAnchor = new Vector3(); // punto del suelo agarrado al pulsar
+const dragPoint = new Vector3(); // punto del suelo bajo el cursor
+const IDENTITY = Matrix.Identity();
 
 canvas.addEventListener('wheel', (e) => {
   e.preventDefault();
@@ -171,6 +182,70 @@ canvas.addEventListener('wheel', (e) => {
     Math.max(CONFIG.camZoomMin, camZoom + Math.sign(e.deltaY) * 1.5),
   );
 });
+
+function placeCamera(zoom: number): void {
+  // Altura = distancia → pitch de 45°. Mirar al objetivo suavizado (no al
+  // jugador directo) mantiene la orientación exactamente fija.
+  camera.position.set(camTarget.x, zoom, camTarget.z + zoom);
+  camLookAt.set(camTarget.x, 1, camTarget.z);
+  camera.setTarget(camLookAt);
+}
+
+// Punto del suelo (y = 0) bajo el píxel (x, y) del canvas.
+function groundAt(x: number, y: number, out: Vector3): boolean {
+  const ray = scene.createPickingRay(x, y, IDENTITY, camera);
+  if (ray.direction.y > -1e-3) return false;
+  const t = -ray.origin.y / ray.direction.y;
+  out.set(ray.origin.x + ray.direction.x * t, 0, ray.origin.z + ray.direction.z * t);
+  return true;
+}
+
+// Arrastre: el punto del suelo agarrado se queda bajo el cursor.
+canvas.addEventListener('pointerdown', (e) => {
+  if (e.button !== 0 || world.indoors || !groundAt(e.offsetX, e.offsetY, dragAnchor)) return;
+  dragging = true;
+  canvas.setPointerCapture(e.pointerId);
+  canvas.classList.add('dragging');
+});
+canvas.addEventListener('pointermove', (e) => {
+  if (!dragging || !groundAt(e.offsetX, e.offsetY, dragPoint)) return;
+  camFree = true;
+  const half = CONFIG.groundSize / 2;
+  camTarget.x = Math.min(half, Math.max(-half, camTarget.x + dragAnchor.x - dragPoint.x));
+  camTarget.z = Math.min(half, Math.max(-half, camTarget.z + dragAnchor.z - dragPoint.z));
+  placeCamera(camZoom); // al momento: el siguiente movimiento se mide con la cámara nueva
+});
+const endDrag = (e: PointerEvent) => {
+  if (!dragging) return;
+  dragging = false;
+  canvas.releasePointerCapture(e.pointerId);
+  canvas.classList.remove('dragging');
+};
+canvas.addEventListener('pointerup', endDrag);
+canvas.addEventListener('pointercancel', endDrag);
+
+// ¿Se ve el granjero? Se proyecta a pantalla con la cámara actual.
+function playerOnScreen(): boolean {
+  const w = engine.getRenderWidth();
+  const h = engine.getRenderHeight();
+  Vector3.ProjectToRef(
+    player.position,
+    Matrix.IdentityReadOnly,
+    scene.getTransformMatrix(),
+    camera.viewport.toGlobal(w, h),
+    playerScreen,
+  );
+  const mx = w * VIEW_MARGIN;
+  const my = h * VIEW_MARGIN;
+  return (
+    playerScreen.z >= 0 &&
+    playerScreen.z <= 1 &&
+    playerScreen.x > mx &&
+    playerScreen.x < w - mx &&
+    playerScreen.y > my &&
+    playerScreen.y < h - my
+  );
+}
 
 function interiorViewAt(x: number, z: number): typeof HOME_VIEW | null {
   if (isIndoors(x, z)) return HOME_VIEW;
@@ -182,16 +257,18 @@ function updateCamera(dt: number): void {
   const vista = interiorViewAt(player.position.x, player.position.z);
   const p = vista ?? player.position;
   const zoom = vista ? vista.zoom : camZoom;
-  // Suavizado de posición independiente del framerate (≈5/s)
-  const alpha = 1 - Math.exp(-5 * dt);
-  camTarget.x += (p.x - camTarget.x) * alpha;
-  camTarget.z += (p.z - camTarget.z) * alpha;
-
-  // Altura = distancia → pitch de 45°. Mirar al objetivo suavizado (no al
-  // jugador directo) mantiene la orientación exactamente fija.
-  camera.position.set(camTarget.x, zoom, camTarget.z + zoom);
-  camLookAt.set(camTarget.x, 1, camTarget.z);
-  camera.setTarget(camLookAt);
+  if (vista) camFree = false; // los interiores tienen encuadre fijo
+  // Mapa movido a mano: solo vuelve al granjero si camina fuera del encuadre
+  if (camFree && !dragging && MOVE_KEYS.some((k) => keys[k]) && !playerOnScreen()) {
+    camFree = false;
+  }
+  if (!camFree) {
+    // Suavizado de posición independiente del framerate (≈5/s)
+    const alpha = 1 - Math.exp(-5 * dt);
+    camTarget.x += (p.x - camTarget.x) * alpha;
+    camTarget.z += (p.z - camTarget.z) * alpha;
+  }
+  placeCamera(zoom);
 }
 
 // ---------- Guardado / carga ----------
@@ -234,6 +311,7 @@ function moveThroughDoor(x: number, z: number, heading: number): void {
   ui.fadeToBlack(() => {
     player.teleport(x, z, heading);
     const foco = interiorViewAt(x, z) ?? { x, z };
+    camFree = false;
     camTarget.x = foco.x;
     camTarget.z = foco.z;
   }, DOOR_HOLD_MS);
