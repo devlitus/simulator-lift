@@ -15,6 +15,20 @@ interface PathTile {
   variant: number;
 }
 
+// Planta del almacén (centrada en el GLB, que mide ~2.06×2.2 tras el
+// escalado de la vista) y hueco de la puerta en la pared oeste.
+const STORAGE = {
+  x: 12.47,
+  z: 5,
+  width: 2.06,
+  depth: 2.2,
+  wallThickness: 0.2,
+  doorWidth: 1.1,
+  doorwayMargin: 0.4, // el corte se activa ya en el umbral de la puerta
+};
+// Recorta lo que queda por encima de 1.3 m (Babylon descarta y - 1.3 > 0)
+const STORAGE_CUT_PLANE = new BABYLON.Plane(0, 1, 0, -1.3);
+
 export class WorldView {
   scene: any;
   bus: EventBus;
@@ -24,6 +38,7 @@ export class WorldView {
   shadow: any;
   pen: PenConfig;
   sellBin: { x: number; z: number };
+  storageCut = false; // el granjero está dentro del almacén
 
   constructor(
     scene: any,
@@ -537,25 +552,46 @@ export class WorldView {
   // parcela, separado de los surcos, con la puerta mirando a la parcela
   // (oeste, -x). Ya no es interactuable: la venta pasa por el puesto de
   // ventas (buildSalesStand), que queda justo al este del almacén.
+  // El GLB es hueco: la colisión son cuatro paredes con un hueco en la
+  // puerta, así que solo se entra y se sale por ella.
   buildStorage(): void {
-    const { x, z } = { x: 13.5, z: 5 }; // posición del almacén
+    const { x, z } = STORAGE; // centro del almacén
+    const halfW = STORAGE.width / 2; // eje x (fachada de la puerta al oeste)
+    const halfD = STORAGE.depth / 2; // eje z
+    const t = STORAGE.wallThickness;
+    const halfDoor = STORAGE.doorWidth / 2;
+    const sideLen = halfD - halfDoor; // cada tramo de la pared de la puerta
 
-    // Colisión fija (independiente del modelo): caja invisible que cubre el
-    // volumen del almacén (~2.4×2.2×2.4 tras el escalado de la vista), para
-    // que el granjero no pueda atravesarlo.
-    const hit = BABYLON.MeshBuilder.CreateBox(
-      'storageHit',
-      { width: 2.5, height: 2.4, depth: 2.5 },
-      this.scene,
-    );
-    hit.position.set(x, 1.2, z);
-    hit.isVisible = false;
-    hit.physicsImpostor = new BABYLON.PhysicsImpostor(
-      hit,
-      BABYLON.PhysicsImpostor.BoxImpostor,
-      { mass: 0 },
-      this.scene,
-    );
+    // Paredes: colisión fija (independiente del modelo) y, a la vez,
+    // primitivas de respaldo visibles hasta que carga el GLB.
+    const wallMat = this.mat(0.55, 0.38, 0.22);
+    const walls: { w: number; d: number; px: number; pz: number }[] = [
+      { w: t, d: STORAGE.depth, px: x + halfW - t / 2, pz: z }, // este
+      { w: STORAGE.width, d: t, px: x, pz: z - halfD + t / 2 }, // norte
+      { w: STORAGE.width, d: t, px: x, pz: z + halfD - t / 2 }, // sur
+      { w: t, d: sideLen, px: x - halfW + t / 2, pz: z - halfD + sideLen / 2 }, // oeste, norte
+      { w: t, d: sideLen, px: x - halfW + t / 2, pz: z + halfD - sideLen / 2 }, // oeste, sur
+    ];
+    const wallMeshes: any[] = [];
+    for (const { w, d, px, pz } of walls) {
+      const wall = BABYLON.MeshBuilder.CreateBox(
+        'storageWall',
+        { width: w, height: 1.6, depth: d },
+        this.scene,
+      );
+      wall.position.set(px, 0.8, pz);
+      wall.material = wallMat;
+      wall.receiveShadows = true;
+      wall.physicsImpostor = new BABYLON.PhysicsImpostor(
+        wall,
+        BABYLON.PhysicsImpostor.BoxImpostor,
+        { mass: 0 },
+        this.scene,
+      );
+      this.addShadow(wall);
+      this._clipWithStorageCut(wall);
+      wallMeshes.push(wall);
+    }
 
     // Nodo raíz: posición y giro para que la puerta mire a la parcela
     // (oeste, -x): la puerta del GLB mira hacia +z, como las casas; -π/2 en
@@ -564,53 +600,33 @@ export class WorldView {
     root.position.set(x, 0, z);
     root.rotation.y = -Math.PI / 2;
 
-    // Primitivas de respaldo (colgadas del root: la puerta en +z local
-    // queda hacia +x del mundo), con el estilo del resto del pueblo
+    // Tejado de respaldo a dos aguas (colgado del root: la cumbrera va de
+    // la puerta a la pared trasera), con el estilo del resto del pueblo
     const prims: any[] = [];
-    const base = BABYLON.MeshBuilder.CreateBox(
-      'storageBase',
-      { width: 2.4, height: 1.5, depth: 2.4 },
-      this.scene,
-    );
-    base.parent = root;
-    base.position.y = 0.75;
-    base.material = this.mat(0.55, 0.38, 0.22);
-    base.receiveShadows = true;
-    this.addShadow(base);
-    prims.push(base);
-
-    // Tejado a dos aguas: dos tablas inclinadas con voladizo
     const roofMat = this.mat(0.55, 0.22, 0.18);
     for (const side of [-1, 1]) {
       const slope = BABYLON.MeshBuilder.CreateBox(
         'storageRoof',
-        { width: 2.9, height: 0.08, depth: 1.1 },
+        { width: 2.7, height: 0.08, depth: 1.05 },
         this.scene,
       );
       slope.parent = root;
-      slope.position.set(0, 2.0, side * 0.55);
+      slope.position.set(0, 2.0, side * 0.5);
       slope.rotation.x = side * 0.72;
       slope.material = roofMat;
       this.addShadow(slope);
+      this._clipWithStorageCut(slope);
       prims.push(slope);
     }
 
-    const door = BABYLON.MeshBuilder.CreateBox(
-      'storageDoor',
-      { width: 1.1, height: 1.25, depth: 0.1 },
-      this.scene,
-    );
-    door.parent = root;
-    door.position.set(0, 0.63, 1.21);
-    door.material = this.mat(0.35, 0.22, 0.1);
-    prims.push(door);
-
-    this._loadStorage(root, prims);
+    this._loadStorage(root, prims, wallMeshes);
   }
 
   // Carga el GLB del almacén y sustituye a las primitivas (mismo patrón que
   // playerView/npcView: escala y apoyo en suelo por caja envolvente real).
-  private async _loadStorage(root: any, prims: any[]): Promise<void> {
+  // El GLB no tiene el origen en su centro: se centra en el root para que
+  // coincida con las paredes de colisión.
+  private async _loadStorage(root: any, prims: any[], walls: any[]): Promise<void> {
     try {
       const res = await BABYLON.SceneLoader.ImportMeshAsync(
         '',
@@ -624,13 +640,49 @@ export class WorldView {
       model.parent = root;
       model.scaling = new BABYLON.Vector3(escala, escala, escala);
       model.position.y = -min.y * escala;
+      // Centrado medido ya en el mundo (tras escala y giro del root)
+      const placed = model.getHierarchyBoundingVectors(true);
+      root.position.x += STORAGE.x - (placed.min.x + placed.max.x) / 2;
+      root.position.z += STORAGE.z - (placed.min.z + placed.max.z) / 2;
       for (const m of res.meshes) {
-        if (m.getTotalVertices() > 0) this.addShadow(m);
+        if (m.getTotalVertices() > 0) {
+          this.addShadow(m);
+          this._clipWithStorageCut(m);
+        }
       }
       for (const p of prims) p.dispose();
+      // Las paredes siguen colisionando, pero ya no se ven ni dan sombra
+      const renderList = this.shadow?.getShadowMap().renderList;
+      for (const w of walls) {
+        w.isVisible = false;
+        if (renderList) renderList.splice(renderList.indexOf(w), 1);
+      }
     } catch {
       // fallback: se quedan las primitivas
     }
+  }
+
+  // Corte del almacén: mientras el granjero está dentro (o en el umbral),
+  // el almacén se dibuja recortado a media altura para que se le vea con
+  // la cámara isométrica. El plano de recorte es de escena, así que se
+  // activa solo durante el dibujado de las mallas del almacén.
+  private _clipWithStorageCut(mesh: any): void {
+    mesh.onBeforeRenderObservable.add(() => {
+      if (this.storageCut) this.scene.clipPlane = STORAGE_CUT_PLANE;
+    });
+    mesh.onAfterRenderObservable.add(() => {
+      this.scene.clipPlane = null;
+    });
+  }
+
+  // Lo llama main.ts cada frame con la posición del jugador.
+  updateStorageCutaway(px: number, pz: number): void {
+    const margin = STORAGE.doorwayMargin;
+    this.storageCut =
+      px > STORAGE.x - STORAGE.width / 2 - margin &&
+      px < STORAGE.x + STORAGE.width / 2 &&
+      pz > STORAGE.z - STORAGE.depth / 2 &&
+      pz < STORAGE.z + STORAGE.depth / 2;
   }
 
   // Puesto de ventas: modelo GLB (assets/puesto_ventas.glb, publicado en

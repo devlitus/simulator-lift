@@ -222,6 +222,7 @@ engine.runRenderLoop(() => {
 
   const canMove = !ui.modalOpen;
   player.update(dt, keys, canMove);
+  world.updateStorageCutaway(player.position.x, player.position.z);
   npcs.update(dt);
   animalView.update(dt);
   updateCamera(dt);
