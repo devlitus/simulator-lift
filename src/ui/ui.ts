@@ -29,7 +29,7 @@ export class GameUI {
   animals: Record<string, AnimalDef>;
   feedDef: FeedDef;
   el: Record<string, HTMLElement>;
-  sleeping = false; // fundido a negro de dormir en curso
+  sleeping = false; // fundido a negro en curso
 
   constructor(
     bus: EventBus,
@@ -205,11 +205,12 @@ export class GameUI {
     this.el.hint.classList.remove('hidden');
   }
 
-  // ---------- Dormir ----------
+  // ---------- Fundido (dormir, entrar y salir de casa) ----------
 
-  // Funde a negro, llama a `onDark` con la pantalla a oscuras y vuelve a
-  // aclarar. Mientras dura, cuenta como ventana abierta (sin input).
-  fadeSleep(onDark: () => void): void {
+  // Funde a negro, llama a `onDark` con la pantalla a oscuras, la mantiene
+  // `holdMs` y vuelve a aclarar. Mientras dura, cuenta como ventana abierta
+  // (sin input).
+  fadeToBlack(onDark: () => void, holdMs = 700): void {
     if (this.sleeping) return;
     this.sleeping = true;
     this.el.sleepFade.classList.add('dark');
@@ -218,7 +219,7 @@ export class GameUI {
       setTimeout(() => {
         this.el.sleepFade.classList.remove('dark');
         setTimeout(() => (this.sleeping = false), 800);
-      }, 700);
+      }, holdMs);
     }, 900);
   }
 

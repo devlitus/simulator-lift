@@ -176,6 +176,14 @@ Contenido binario del juego: modelos `.glb`, texturas y audio.
   métricas y preview en [`assets/casa_granjero/`](casa_granjero/README.md).
   Se sirve como `public/models/casa_granjero.glb`, con colisiones fijas y
   casa de primitivas como respaldo.
+- `casa_interior.glb` — interior de esa casa, un escenario propio al que se
+  entra por la puerta: diorama de 16 × 10 m con salón comedor, cocina abierta,
+  baño y dormitorio. Referencia y texturas con ComfyUI
+  (Z-Image-Turbo) y modelado por script en Blender. Fuente editable
+  `assets/casa_interior.blend`; todo lo demás en
+  [`assets/casa_interior/`](casa_interior/README.md). Se sirve como
+  `public/models/casa_interior.glb`, con colisiones fijas y estancia de
+  primitivas como respaldo.
 - `puesto_ventas.glb` — modelo 3D del puesto de ventas del granjero generado
   con Hunyuan3D-2 (servidor local, imagen→3D con textura 2048×2048) a partir
   de `assets/puesto_ventas_referencia.png` (imagen generada con ComfyUI en

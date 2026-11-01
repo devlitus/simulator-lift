@@ -21,6 +21,7 @@ import { TransformNode } from '@babylonjs/core/Meshes/transformNode';
 import { PhysicsImpostor } from '@babylonjs/core/Physics/v1/physicsImpostor';
 import { Scene } from '@babylonjs/core/scene';
 import type { ISceneLoaderAsyncResult, Node } from '@babylonjs/core';
+import { FARMER_HOUSE, PORCH_BARRIERS } from './farmerPorch';
 import { WellView } from './wellView';
 
 interface PathTile {
@@ -56,10 +57,6 @@ export const TREE_SPOTS: number[][] = [
   [-16, -16],
 ];
 
-// Casa del granjero (assets/casa_granjero/): cabaña de 5×4 m con la puerta
-// al sur (+z), mirando a la cámara, y porche delante.
-const FARMER_HOUSE = { x: -6.5, z: 14, width: 5.2, depth: 4.2, height: 4.8 };
-
 // Recorta lo que queda por encima de 1.3 m (Babylon descarta y - 1.3 > 0)
 const STORAGE_CUT_PLANE = new Plane(0, 1, 0, -1.3);
 
@@ -77,9 +74,9 @@ export class WorldView {
   wellCrank: { x: number; z: number }; // donde se pone el granjero para girar la manivela
   wellView: WellView | null = null; // animación del cubo (si carga el GLB)
   storageCut = false; // el granjero está dentro del almacén
-  homeDoor: { x: number; z: number }; // puerta de la casa del granjero (dormir)
-  homeWake: { x: number; z: number }; // donde aparece el granjero al despertar
   private homeWindows: PBRMaterial | null = null; // cristales: se encienden de noche
+  indoors = false; // el granjero está en el interior de su casa (ver homeInterior)
+  daylight = 1; // luz diurna fuera: 0 de noche, 1 al mediodía
 
   constructor(
     scene: Scene,
@@ -121,9 +118,6 @@ export class WorldView {
     // La manivela sale por el lado -x del pozo (a la derecha en pantalla):
     // pozo.glb la tiene en +x de Blender y la conversión de ejes la refleja.
     this.wellCrank = { x: this.well.x - 1.35, z: this.well.z };
-    const h = FARMER_HOUSE;
-    this.homeDoor = { x: h.x, z: h.z + h.depth / 2 };
-    this.homeWake = { x: h.x, z: h.z + h.depth / 2 + 1.9 }; // al pie del escalón
 
     this.buildGround();
     this.buildBounds();
@@ -880,14 +874,15 @@ export class WorldView {
     }
   }
 
-  // Casa del granjero: colisión fija (cuerpo + porche con escalón) que no
-  // depende del GLB, y casa de primitivas como respaldo si falla la carga.
+  // Casa del granjero: colisión fija (cuerpo y barreras del porche, que solo
+  // deja subir por el peldaño) que no depende del GLB, y casa de primitivas
+  // como respaldo si falla la carga.
   buildFarmerHouse(): void {
     const { x, z, width, depth, height } = FARMER_HOUSE;
     const colliders = [
       // Cuerpo, con la chimenea al oeste y la leña al este
       { w: width + 1.4, h: height, d: depth, cx: x, cz: z },
-      { w: 2.5, h: 0.5, d: 1.4, cx: x, cz: z + depth / 2 + 0.7 }, // porche y escalón
+      ...PORCH_BARRIERS.map((b) => ({ ...b, h: 1 })),
       { w: 0.7, h: 0.8, d: 0.7, cx: x - 2, cz: z + depth / 2 + 0.75 }, // barril
     ];
     for (const c of colliders) {
@@ -1294,6 +1289,15 @@ export class WorldView {
     if (this.homeWindows) {
       const noche = 1 - Math.min(1, f * 3);
       this.homeWindows.emissiveColor.copyFromFloats(1 * noche, 0.72 * noche, 0.35 * noche);
+    }
+
+    this.daylight = f;
+    // Dentro de casa manda la luz de la estancia, sea la hora que sea, y detrás
+    // del diorama no hay paisaje.
+    if (this.indoors) {
+      this.sun.intensity = 0.45;
+      this.hemi.intensity = 0.8;
+      sky.copyFromFloats(0.07, 0.05, 0.04, 1);
     }
   }
 }

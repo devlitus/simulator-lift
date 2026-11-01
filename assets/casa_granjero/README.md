@@ -38,9 +38,9 @@ Caja de 6,37 × 5,92 × 4,88 m (porche, chimenea y leña incluidos), ver
 
 `WorldView.buildFarmerHouse()` la coloca en `(-6.5, 14)`, al sur del recinto,
 la escala a 4,8 m de alto por caja envolvente y añade colisiones fijas
-(cuerpo, porche con escalón y barril) independientes del GLB, con una casa de
-primitivas como respaldo. Junto a la puerta, desde las 18:00
-(`BALANCE.sleepFromHour`), `E` duerme hasta las 06:00 del día siguiente.
+(cuerpo, barreras del porche y barril) independientes del GLB, con una casa de
+primitivas como respaldo. Es solo el exterior: `Intro` frente a la puerta lleva al
+escenario interior (`assets/casa_interior/`), donde está la cama.
 
 ## Reproducir desde la raíz del repositorio
 

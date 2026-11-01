@@ -310,3 +310,9 @@ body {
 .hidden {
   display: none !important;
 }
+
+/* Dentro de casa no se muestran las misiones ni el inventario */
+body.indoors #quest-panel,
+body.indoors #inventory {
+  display: none;
+}
