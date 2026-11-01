@@ -9,7 +9,7 @@ export const QUEST_DEFS: QuestDef[] = QuestsSchema.parse([
   {
     id: 'conocer',
     title: 'Nuevo en el pueblo',
-    desc: 'Preséntate hablando con Marta, Gon y Lila',
+    desc: 'Preséntate hablando con tres vecinos: Marta, Gon, Lila o Tomás',
     type: 'talkAll',
     npc: null,
     npcName: null,

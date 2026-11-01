@@ -50,10 +50,12 @@ export const NpcSchema = z.object({
   color: z.tuple([z.number(), z.number(), z.number()]), // RGB 0-1
   home: z.object({ x: z.number(), z: z.number() }),
   waypoints: z.array(z.tuple([z.number(), z.number()])).nullable(), // null = se queda fijo
-  hasShop: z.boolean(),
+  shop: z.enum(['semillas', 'animales', 'flores']).nullable(), // tienda que abre al hablarle
   dialogs: z.array(z.string()).min(4), // uno por nivel de amistad (data/friendship.ts)
 });
 export type NpcDef = z.infer<typeof NpcSchema>;
+/** Tiendas: la de Marta (semillas) y los puestos del mercado (animales, flores). */
+export type ShopKind = NonNullable<NpcDef['shop']>;
 export const NpcsSchema = z.array(NpcSchema);
 
 export const FriendshipLevelSchema = z.object({

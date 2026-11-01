@@ -33,7 +33,18 @@ import { GIFTS } from '../data/gifts';
 import { NPC_DEFS } from '../data/npcs';
 import { QUEST_DEFS } from '../data/quests';
 
-import { TREE_SPOTS, WorldView } from './world/worldView';
+import { WorldView } from './world/worldView';
+import { TREE_SPOTS } from './world/treeSpots';
+import {
+  SHOPS,
+  shopAtDoor,
+  shopDoorSpot,
+  shopEntry,
+  shopExit,
+  shopExitAt,
+  shopInside,
+} from './world/marketLayout';
+import { ShopInteriorView } from './world/shopInteriorView';
 import { canSleep } from './world/sleep';
 import { canEnterDoor, DOOR_SPOT } from './world/farmerPorch';
 import { HomeInteriorView } from './world/homeInteriorView';
@@ -109,6 +120,7 @@ const quests = new QuestSystem(state, bus, QUEST_DEFS);
 const world = new WorldView(scene, bus, { shadows: !lowSpec, pens: PENS });
 new SceneryView(scene, world, TREE_SPOTS);
 const homeInterior = new HomeInteriorView(scene);
+for (const shop of SHOPS) new ShopInteriorView(scene, shop);
 const warehouse = new WarehouseView(
   scene,
   {
@@ -154,6 +166,7 @@ const INDOORS_MAX_Z = 60;
 // Encuadre fijo, algo al sur del centro para que la pista no tape el frente
 const HOME_VIEW = { x: HOME_INTERIOR.x, z: HOME_INTERIOR.z + 1.2, zoom: 13 };
 const WAREHOUSE_VIEW = { x: WAREHOUSE.x, z: WAREHOUSE.z + 0.6, zoom: 15 };
+const SHOP_ZOOM = 11;
 
 // ---------- Cámara de seguimiento estilo Stardew ----------
 // Vista aérea con orientación fija (pitch 45°, mirando hacia -z): la cámara
@@ -249,7 +262,10 @@ function playerOnScreen(): boolean {
 
 function interiorViewAt(x: number, z: number): typeof HOME_VIEW | null {
   if (isIndoors(x, z)) return HOME_VIEW;
-  return isInWarehouse(x, z) ? WAREHOUSE_VIEW : null;
+  if (isInWarehouse(x, z)) return WAREHOUSE_VIEW;
+  const tienda = shopInside(x, z);
+  // Algo al sur del centro, como en casa, para ver el mostrador sin la pista encima
+  return tienda ? { x: tienda.inside.x, z: tienda.inside.z + 0.8, zoom: SHOP_ZOOM } : null;
 }
 
 function updateCamera(dt: number): void {
@@ -350,6 +366,29 @@ function findInteraction(): Interaction | null {
 
   const n = npcs.getInteraction(p);
   if (n) candidates.push(n);
+
+  // Tiendas del mercado: se entra por su puerta; dentro se compra al tendero
+  const tienda = shopAtDoor(p.x, p.z);
+  if (tienda) {
+    const e = shopEntry(tienda);
+    candidates.push({
+      dist: 0, // justo delante de la puerta no hay nada más que hacer
+      label: `Intro ↵: Entrar en ${tienda.name} 🛒`,
+      action: () => moveThroughDoor(e.x, e.z, Math.PI),
+      key: 'enter',
+    });
+  }
+  const salida = shopExitAt(p.x, p.z);
+  if (salida) {
+    const fuera = shopDoorSpot(salida);
+    const puerta = shopExit(salida);
+    candidates.push({
+      dist: Math.hypot(p.x - puerta.x, p.z - puerta.z),
+      label: `Intro ↵: Salir ${salida.name.startsWith('el ') ? `del ${salida.name.slice(3)}` : `de ${salida.name}`} 🚪`,
+      action: () => moveThroughDoor(fuera.x, fuera.z, 0),
+      key: 'enter',
+    });
+  }
 
   const bin = world.sellBin;
   const dBin = Math.hypot(p.x - bin.x, p.z - bin.z);

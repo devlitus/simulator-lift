@@ -197,6 +197,20 @@ Contenido binario del juego: modelos `.glb`, texturas y audio.
   modelado por script en Blender. Fuente editable `assets/entrada_granja.blend`; todo
   lo demás en [`assets/entrada_granja/`](entrada_granja/README.md). Se sirve como
   `public/models/entrada_granja.glb`, con colisiones fijas y primitivas como respaldo.
+- `tienda_semillas.glb`, `tienda_animales.glb` y `tienda_flores.glb` — las
+  tres tiendas del mercado, iguales por fuera: entramado sobre zócalo de
+  piedra, tejado de tejas con el hastial a la calle, dos escaparates con toldo
+  a rayas, faroles y el género expuesto en bancos; cambian el toldo, la pintura,
+  el revoco y el género. Modelado procedural propio en Blender (sin IA), en
+  metros, con colores planos en `COLOR_0`. Fuente `assets/tiendas.blend`;
+  script, piezas compartidas, métricas y previews en
+  [`assets/tiendas/`](tiendas/README.md).
+- `tienda_interior_semillas.glb`, `tienda_interior_animales.glb` y
+  `tienda_interior_flores.glb` — sus interiores en diorama (10 × 7 m):
+  mostrador con la trastienda del tendero, estanterías, mesas y género de cada
+  tienda. Misma planta y colisiones para las tres. Fuente
+  `assets/tienda_interior.blend`; script y previews en
+  [`assets/tienda_interior/`](tienda_interior/README.md).
 - `puesto_ventas.glb` — modelo 3D del puesto de ventas del granjero generado
   con Hunyuan3D-2 (servidor local, imagen→3D con textura 2048×2048) a partir
   de `assets/puesto_ventas_referencia.png` (imagen generada con ComfyUI en
@@ -216,9 +230,8 @@ Contenido binario del juego: modelos `.glb`, texturas y audio.
   vértices), se descartó una isla flotante de 320 caras, se giró 180° sobre el
   eje vertical y se centró con la base en el origen (~1,95×1,70×1,97 unidades).
   Es un edificio estático, sin rig. La fuente editable es
-  `assets/tienda_marta.blend`; se sirve como
-  `public/models/tienda_marta.glb` y `WorldView` conserva una colisión y un
-  fallback de primitivas si falla la carga.
+  `assets/tienda_marta.blend`. **Ya no se usa**: la sustituye
+  `tienda_semillas.glb`, del mismo estilo que las otras tiendas del mercado.
 
 - `models/baldosa_camino_01.glb`, `models/baldosa_camino_02.glb` y
   `models/baldosa_camino_03.glb` — tres variantes de piedra arenisca

@@ -1,0 +1,17 @@
+{
+  "semillas": {
+    "triangulos": 9656,
+    "vertices": 6412,
+    "dimensiones_m": [7.444, 5.975, 5.144]
+  },
+  "animales": {
+    "triangulos": 9192,
+    "vertices": 6108,
+    "dimensiones_m": [7.412, 5.975, 5.154]
+  },
+  "flores": {
+    "triangulos": 11436,
+    "vertices": 7572,
+    "dimensiones_m": [7.269, 5.975, 5.144]
+  }
+}

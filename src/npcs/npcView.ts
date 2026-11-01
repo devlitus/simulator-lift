@@ -92,13 +92,16 @@ export class NPCSystemView {
     } else {
       acc = MeshBuilder.CreateBox('npcAcc', { width: 0.55, height: 0.16, depth: 0.55 }, scene);
       acc.position.set(0, 1.52, 0);
-      acc.material = def.id === 'marta' ? mat(0.7, 0.25, 0.45) : mat(0.25, 0.26, 0.3);
+      const sombrero = { marta: [0.7, 0.25, 0.45], tomas: [0.85, 0.72, 0.4] }[def.id] ?? [
+        0.25, 0.26, 0.3,
+      ];
+      acc.material = mat(sombrero[0], sombrero[1], sombrero[2]);
     }
     acc.parent = root;
 
     const primitivas = [body, head, acc];
-    // Los tres NPCs tienen modelo 3D propio (assets/models/*.glb, publicados
-    // en /models/).
+    // Marta, Lila y Gon tienen modelo 3D propio (assets/models/*.glb,
+    // publicados en /models/); Tomás, de momento, solo las primitivas.
     if (def.id === 'marta') this._loadNpcModel(world, root, primitivas, 'marta.glb');
     else if (def.id === 'lila') this._loadNpcModel(world, root, primitivas, 'lila.glb');
     else if (def.id === 'gon') this._loadNpcModel(world, root, primitivas, 'gon.glb');
@@ -264,8 +267,9 @@ export class NPCSystemView {
     }
 
     buttons.push({ label: '🎁 Regalar', handler: () => this.openGiftMenu(npc) });
-    if (npc.def.hasShop) {
-      buttons.push({ label: '🛒 Comprar', handler: () => this.ui.openShop() });
+    const shop = npc.def.shop;
+    if (shop) {
+      buttons.push({ label: '🛒 Comprar', handler: () => this.ui.openShop(shop) });
     }
     buttons.push({ label: 'Cerrar', handler: () => this.ui.closeDialog() });
 
