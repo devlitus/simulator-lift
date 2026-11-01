@@ -3,6 +3,9 @@
 // Así, p. ej., las misiones se enteran de las cosechas sin conocer la granja.
 // El mapa EventPayloads tipa el payload de cada evento: emitir o escuchar con
 // el tipo equivocado es un error de compilación.
+import type { WeatherKind } from '../calendar/calendar';
+import type { SeasonId } from '../../data/schemas';
+
 export const EVENTS = {
   NOTIFY: 'notify',
   DAY_NEW: 'day:new',
@@ -16,6 +19,8 @@ export const EVENTS = {
   FRIENDSHIP_CHANGED: 'friendship:changed',
   NPC_TALKED: 'npc:talked', // primera charla del día
   QUEST_CHANGED: 'quest:changed',
+  SEASON_CHANGED: 'season:changed', // empieza una estación nueva
+  WEATHER_CHANGED: 'weather:changed', // cambió el clima (día nuevo o partida cargada)
 } as const;
 
 export type EventName = (typeof EVENTS)[keyof typeof EVENTS];
@@ -33,6 +38,8 @@ export type EventPayloads = {
   'friendship:changed': { npcId: string; points: number; leveledUp: boolean; levelLabel: string };
   'npc:talked': { npcId: string };
   'quest:changed': void;
+  'season:changed': { season: SeasonId };
+  'weather:changed': { weather: WeatherKind };
 };
 
 type Listener<E extends EventName> = (payload: EventPayloads[E]) => void;

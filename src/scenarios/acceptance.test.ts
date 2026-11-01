@@ -70,6 +70,7 @@ describe('Escenario: el ciclo económico de la granja es rentable', () => {
 
   it('comprar semilla y no regarla arruina la inversión', () => {
     const { state, farm, economy } = makeWorld();
+    state.season = 'otono'; // la calabaza es de verano y otoño
 
     expect(economy.buySeed('calabaza')).toBe(true);
     const moneyAfterBuy = state.money;

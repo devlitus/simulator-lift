@@ -12,6 +12,8 @@ import type { GameState } from './store';
 function makeState(): GameState {
   return {
     day: 3,
+    season: 'primavera',
+    weather: 'lluvia',
     money: 120,
     seeds: { zanahoria: 1 },
     produce: { zanahoria: 2 },
@@ -43,6 +45,7 @@ describe('buildSave / applySave', () => {
     expect(data).toMatchObject({
       version: 1,
       day: 3,
+      weather: 'lluvia',
       money: 120,
       seeds: { zanahoria: 1 },
       produce: { zanahoria: 2 },
@@ -58,6 +61,8 @@ describe('buildSave / applySave', () => {
   it('restaura el estado a partir de un save válido', () => {
     const state: GameState = {
       day: 1,
+      season: 'primavera',
+      weather: 'sol',
       money: 0,
       seeds: {},
       produce: {},
@@ -70,7 +75,8 @@ describe('buildSave / applySave', () => {
       talkedToday: { x: true },
     };
     const saved = {
-      day: 5,
+      day: 9,
+      weather: 'nublado',
       money: 200,
       seeds: { tomate: 3 },
       produce: {},
@@ -93,7 +99,9 @@ describe('buildSave / applySave', () => {
     } as unknown as AnimalPersistence;
 
     expect(applySave(saved, state, farm, quests, animals)).toBe(true);
-    expect(state.day).toBe(5);
+    expect(state.day).toBe(9);
+    expect(state.season).toBe('verano'); // se deriva del día, no se lee del save
+    expect(state.weather).toBe('nublado');
     expect(state.money).toBe(200);
     expect(state.seeds).toEqual({ tomate: 3 });
     expect(state.feed).toBe(4);
@@ -111,6 +119,12 @@ describe('buildSave / applySave', () => {
     expect(state.feed).toBe(2); // conserva el valor actual
     expect(state.water).toBe(3); // saves sin regadera conservan el agua actual
     expect(state.animalProducts).toEqual({ oveja: 1 });
+    expect(state.weather).toBe('lluvia'); // saves sin clima conservan el actual
+  });
+
+  it('rechaza un clima desconocido', () => {
+    const state = makeState();
+    expect(applySave({ weather: 'granizo' }, state, fakeFarm, fakeQuests, fakeAnimals)).toBe(false);
   });
 
   it('devuelve false y no muta el estado si no hay datos', () => {

@@ -1,7 +1,8 @@
 // Economy (dominio puro, SIN Babylon): monedas, compras y venta de cosecha
 // y productos de granja.
 import { EVENTS, EventBus } from '../core/events';
-import type { AnimalDef, CropDef, FeedDef, GiftDef } from '../../data/schemas';
+import type { AnimalDef, CropDef, FeedDef, GiftDef, SeasonId } from '../../data/schemas';
+import { inSeason } from '../calendar/calendar';
 
 // Subconjunto del GameState (ver core/store.ts) que necesita Economy.
 export interface EconomyState {
@@ -11,6 +12,7 @@ export interface EconomyState {
   gifts: Record<string, number>;
   feed: number;
   animalProducts: Record<string, number>;
+  season?: SeasonId; // sin estación (tests antiguos) se venden todas las semillas
 }
 
 export class Economy {
@@ -37,7 +39,19 @@ export class Economy {
     this.feedDef = feedDef;
   }
 
+  /** La tienda solo vende semillas de la estación actual. */
+  seedInSeason(type: string): boolean {
+    return !this.state.season || inSeason(this.crops[type], this.state.season);
+  }
+
   buySeed(type: string): boolean {
+    if (!this.seedInSeason(type)) {
+      this.bus.emit(
+        EVENTS.NOTIFY,
+        `📅 Las semillas de ${this.crops[type].name} no son de temporada`,
+      );
+      return false;
+    }
     const price = this.crops[type].seedPrice;
     if (this.state.money < price) {
       this.bus.emit(EVENTS.NOTIFY, '🪙 No tienes suficiente dinero');

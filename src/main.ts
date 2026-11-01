@@ -33,8 +33,11 @@ import { GIFTS } from '../data/gifts';
 import { NPC_DEFS } from '../data/npcs';
 import { VILLAGERS } from '../data/villagers';
 import { QUEST_DEFS } from '../data/quests';
+import { SEASONS } from '../data/seasons';
+import { beginDay, WEATHER_INFO } from './calendar/calendar';
 
 import { WorldView } from './world/worldView';
+import { WeatherView } from './world/weatherView';
 import { TREE_SPOTS } from './world/treeSpots';
 import {
   SHOPS,
@@ -121,6 +124,7 @@ const quests = new QuestSystem(state, bus, QUEST_DEFS);
 // ---------- Vistas Babylon + UI ----------
 const world = new WorldView(scene, bus, { shadows: !lowSpec, pens: PENS });
 new SceneryView(scene, world, TREE_SPOTS);
+const weatherView = new WeatherView(scene);
 const homeInterior = new HomeInteriorView(scene);
 for (const shop of SHOPS) new ShopInteriorView(scene, shop);
 const warehouse = new WarehouseView(
@@ -300,8 +304,19 @@ function loadGame(): boolean {
   const data = saveRepo.load();
   const ok = applySave(data, state, farmLogic, quests, animalLogic);
   if (ok) bus.emit(EVENTS.INVENTORY_CHANGED); // el HUD se pintó antes de cargar
+  bus.emit(EVENTS.SEASON_CHANGED, { season: state.season });
+  bus.emit(EVENTS.WEATHER_CHANGED, { weather: state.weather });
   return ok;
 }
+
+// ---------- Estación y clima: solo las vistas los pintan ----------
+bus.on(EVENTS.SEASON_CHANGED, ({ season }) => {
+  world.setSeasonTint(SEASONS.seasons.find((s) => s.id === season)!.grassTint);
+});
+bus.on(EVENTS.WEATHER_CHANGED, ({ weather }) => {
+  world.setWeather(weather);
+  weatherView.setWeather(weather);
+});
 
 // ---------- Riego: el granjero anima la regadera sobre el surco ----------
 bus.on(EVENTS.FARM_WATERED, ({ index }) => player.playWater(farmView.tiles[index]));
@@ -347,11 +362,25 @@ function sleep(): void {
 
 // ---------- Ciclo de día nuevo ----------
 bus.on(EVENTS.DAY_NEW, ({ day }) => {
-  state.day = day;
+  const { season, seasonChanged, rain } = beginDay(state, day, SEASONS, Math.random);
   state.talkedToday = {};
-  farmLogic.newDay();
+  farmLogic.newDay(); // crece lo regado ayer
   animalLogic.newDay();
   bus.emit(EVENTS.NOTIFY, `🌅 Comienza el día ${state.day}`);
+  if (seasonChanged) {
+    bus.emit(EVENTS.NOTIFY, `${season.icon} ¡Llega ${season.name.toLowerCase()}!`);
+    farmLogic.changeSeason();
+    bus.emit(EVENTS.SEASON_CHANGED, { season: season.id });
+  }
+  if (rain && farmLogic.rain() > 0) {
+    bus.emit(EVENTS.NOTIFY, '🌧️ Hoy llueve: la granja se riega sola');
+  } else if (state.weather !== 'sol') {
+    bus.emit(
+      EVENTS.NOTIFY,
+      `${WEATHER_INFO[state.weather].icon} Hoy está ${WEATHER_INFO[state.weather].name.toLowerCase()}`,
+    );
+  }
+  bus.emit(EVENTS.WEATHER_CHANGED, { weather: state.weather });
   saveGame(true);
   bus.emit(EVENTS.NOTIFY, '💾 Autoguardado');
 });
@@ -593,6 +622,7 @@ engine.runRenderLoop(() => {
   villagers.update(dt, player.position);
   animalView.update(dt);
   updateCamera(dt);
+  weatherView.update(camTarget.x, camTarget.z, world.indoors);
 
   currentInteraction = canMove ? findInteraction() : null;
   ui.showHint(currentInteraction ? currentInteraction.label : null);

@@ -13,6 +13,8 @@ import type { AnimalLogic } from '../animals/animalLogic';
 import type { AnimalDef, CropDef, FeedDef, GiftDef, ShopKind } from '../../data/schemas';
 import { WATERING_CAN_CAPACITY } from '../../data/farm';
 import type { DialogButton } from '../core/types';
+import { SEASONS } from '../../data/seasons';
+import { dayOfSeason, seasonOf, WEATHER_INFO } from '../calendar/calendar';
 
 const SHOP_TITLES: Record<ShopKind, string> = {
   semillas: '🌱 Tienda de semillas de Marta',
@@ -122,7 +124,12 @@ export class GameUI {
   // constantemente y esto es más barato que comparar snapshots).
   tick(): void {
     this.el.money.textContent = `🪙 ${this.state.money}`;
-    this.el.day.textContent = `📅 Día ${this.state.day}`;
+    const { day, weather } = this.state;
+    const season = seasonOf(day, SEASONS);
+    this.el.day.textContent =
+      `📅 Día ${day} · ${season.icon} ${season.name} ${dayOfSeason(day, SEASONS)}/${SEASONS.daysPerSeason}` +
+      ` · ${WEATHER_INFO[weather].icon}`;
+    this.el.day.title = WEATHER_INFO[weather].name;
     this.el.time.textContent = `🕒 ${this.world.getTimeString()}`;
   }
 
@@ -292,12 +299,18 @@ export class GameUI {
     if (this.shopKind === 'semillas') {
       for (const key of Object.keys(this.crops)) {
         const c = this.crops[key];
+        const enTemporada = this.economy.seedInSeason(key);
+        const estaciones = SEASONS.seasons
+          .filter((t) => c.seasons.includes(t.id))
+          .map((t) => `${t.icon} ${t.name}`)
+          .join(', ');
         rows.push(
           this.shopRow(
-            `${c.icon} Semilla de ${c.name} — crece en ${c.daysToGrow} días, se vende a ${c.sellPrice}🪙`,
+            `${c.icon} Semilla de ${c.name} — crece en ${c.daysToGrow} días, se vende a ${c.sellPrice}🪙` +
+              (enTemporada ? '' : ` · fuera de temporada (${estaciones})`),
             `${c.seedPrice} 🪙`,
             `tienes ${s.seeds[key]}`,
-            s.money >= c.seedPrice,
+            enTemporada && s.money >= c.seedPrice,
             () => this.economy.buySeed(key),
           ),
         );

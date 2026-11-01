@@ -11,6 +11,7 @@ const CROPS: Record<string, CropDef> = {
     sellPrice: 25,
     daysToGrow: 2,
     color: '#e07b2a',
+    seasons: ['primavera'],
   },
   tomate: {
     name: 'Tomate',
@@ -19,6 +20,7 @@ const CROPS: Record<string, CropDef> = {
     sellPrice: 40,
     daysToGrow: 3,
     color: '#d1342c',
+    seasons: ['primavera'],
   },
 };
 const GIFTS: Record<string, GiftDef> = {
@@ -70,6 +72,16 @@ describe('Economy', () => {
     expect(economy.buySeed('tomate')).toBe(false);
     expect(state.money).toBe(5);
     expect(state.seeds.tomate).toBe(0);
+  });
+
+  it('no vende semillas fuera de temporada', () => {
+    state.season = 'invierno';
+    expect(economy.seedInSeason('zanahoria')).toBe(false);
+    expect(economy.buySeed('zanahoria')).toBe(false);
+    expect(state.money).toBe(30);
+    expect(state.seeds.zanahoria).toBe(0);
+    state.season = 'primavera';
+    expect(economy.buySeed('zanahoria')).toBe(true);
   });
 
   it('compra un regalo descontando su precio', () => {
