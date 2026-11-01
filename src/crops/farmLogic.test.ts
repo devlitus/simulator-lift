@@ -45,6 +45,16 @@ describe('FarmLogic', () => {
     expect(farm.plant(0, 'zanahoria')).toBe(false); // ya ocupado
   });
 
+  it('avisa del riego con el índice del surco, solo si riega', () => {
+    const regados: number[] = [];
+    bus.on(EVENTS.FARM_WATERED, ({ index }) => regados.push(index));
+    expect(farm.water(1)).toBe(false); // surco vacío
+    farm.plant(1, 'zanahoria');
+    expect(farm.water(1)).toBe(true);
+    expect(farm.water(1)).toBe(false); // ya regado
+    expect(regados).toEqual([1]);
+  });
+
   it('crece un día por cada día regado hasta madurar', () => {
     farm.plant(0, 'zanahoria');
     farm.water(0);

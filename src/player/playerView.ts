@@ -1,6 +1,6 @@
 // PlayerView (vista Babylon): avatar del jugador con física (impostor de caja)
 // y movimiento con WASD / flechas. Sin reglas de juego: solo traduce input a
-// velocidad.
+// velocidad y reproduce las animaciones (caminar, reposo, regar).
 import { CONFIG } from '../core/constants';
 import type { WorldView } from '../world/worldView';
 
@@ -10,8 +10,14 @@ export class PlayerView {
   visual: any;
   private _vel: any;
   private _primitives: any[];
-  private _anims: { walk?: any; idle?: any } = {};
+  private _anims: { walk?: any; idle?: any; water?: any } = {};
   private _animActual: string | null = null;
+  // Regadera del GLB (emparentada a la mano en Blender): solo se ve al regar
+  private _regadera: any = null;
+  private _spoutTip: any = null;
+  private _agua: any = null;
+  private _riego = 0; // segundos que faltan de la animación de riego
+  private _riegoTotal = 0;
 
   constructor(scene: any, world: WorldView) {
     this.scene = scene;
@@ -98,10 +104,17 @@ export class PlayerView {
         this.scene,
       );
       const model = res.meshes[0];
+      const nodos = [...res.meshes, ...(res.transformNodes ?? [])];
+      this._regadera = nodos.find((n: any) => n.name === 'Regadera') ?? null;
+      this._spoutTip = nodos.find((n: any) => n.name === 'spout_tip') ?? null;
+      this._regadera?.setEnabled(false);
       // Se escala a la altura del avatar de primitivas (~1.3 m) y se apoya
       // en el suelo a partir de la caja envolvente real del modelo, así el
-      // código no depende de las medidas de cada .glb
-      const { min, max } = model.getHierarchyBoundingVectors(true);
+      // código no depende de las medidas de cada .glb. La regadera no cuenta.
+      const { min, max } = model.getHierarchyBoundingVectors(
+        true,
+        (m: any) => !m.name.startsWith('Regadera'),
+      );
       const escala = 1.3 / (max.y - min.y);
       model.parent = this.visual;
       model.scaling = new BABYLON.Vector3(escala, escala, escala);
@@ -124,6 +137,7 @@ export class PlayerView {
       const nombre = (g.name ?? '').toLowerCase();
       if (nombre.includes('walk')) this._anims.walk = g;
       else if (nombre.includes('idle')) this._anims.idle = g;
+      else if (nombre.includes('water')) this._anims.water = g;
       g.stop();
     }
     if (this._anims.idle) {
@@ -138,9 +152,93 @@ export class PlayerView {
     if (siguiente === this._animActual) return;
     const grupo = this._anims[siguiente];
     if (!grupo) return;
-    if (this._animActual) this._anims[this._animActual as 'walk' | 'idle']?.stop();
+    if (this._animActual) this._anims[this._animActual as 'walk' | 'idle' | 'water']?.stop();
     grupo.start(true);
     this._animActual = siguiente;
+  }
+
+  /** Mientras riega, el granjero no se mueve ni interactúa. */
+  get busy(): boolean {
+    return this._riego > 0;
+  }
+
+  // Riega el surco en (x, z): se gira hacia él, saca la regadera y reproduce
+  // `water` una vez. Sin el GLB (primitivas) solo cae el agua delante.
+  playWater(target: { x: number; z: number }): void {
+    const p = this.root.position;
+    this.visual.rotation.y = Math.atan2(target.x - p.x, target.z - p.z);
+    const imp = this.root.physicsImpostor;
+    imp.setLinearVelocity(new BABYLON.Vector3(0, imp.getLinearVelocity().y, 0));
+
+    const water = this._anims.water;
+    // Duración real: el cargador glTF expresa los frames a sus propios fps
+    const fps = water?.targetedAnimations[0]?.animation.framePerSecond ?? 60;
+    this._riegoTotal = water ? (water.to - water.from) / fps : 0.9;
+    this._riego = this._riegoTotal;
+    if (!water) return;
+    if (this._animActual) this._anims[this._animActual as 'walk' | 'idle' | 'water']?.stop();
+    this._regadera?.setEnabled(true);
+    water.start(false);
+    this._animActual = 'water';
+  }
+
+  // Chorro de agua: partículas pequeñas que caen desde la alcachofa
+  private _crearAgua(): any {
+    const tex = new BABYLON.DynamicTexture('gotaTex', 32, this.scene, false);
+    const ctx = tex.getContext();
+    ctx.fillStyle = 'white';
+    ctx.beginPath();
+    ctx.arc(16, 16, 14, 0, Math.PI * 2);
+    ctx.fill();
+    tex.hasAlpha = true;
+    tex.update();
+    const ps = new BABYLON.ParticleSystem('agua', 300, this.scene);
+    ps.particleTexture = tex;
+    ps.emitter = new BABYLON.Vector3();
+    ps.minEmitBox = new BABYLON.Vector3(-0.02, 0, -0.02);
+    ps.maxEmitBox = new BABYLON.Vector3(0.02, 0, 0.02);
+    ps.color1 = new BABYLON.Color4(0.45, 0.7, 1, 1);
+    ps.color2 = new BABYLON.Color4(0.7, 0.88, 1, 1);
+    ps.colorDead = new BABYLON.Color4(0.6, 0.8, 1, 0);
+    ps.minSize = 0.06;
+    ps.maxSize = 0.1;
+    ps.minLifeTime = 0.25;
+    ps.maxLifeTime = 0.4;
+    ps.emitRate = 220;
+    ps.gravity = new BABYLON.Vector3(0, -9, 0);
+    ps.direction1 = new BABYLON.Vector3(-0.3, -0.5, -0.3);
+    ps.direction2 = new BABYLON.Vector3(0.3, -0.2, 0.3);
+    ps.minEmitPower = 0.4;
+    ps.maxEmitPower = 0.8;
+    ps.blendMode = BABYLON.ParticleSystem.BLENDMODE_STANDARD;
+    return ps;
+  }
+
+  // Avanza el riego: agua en la parte central (la regadera inclinada) y, al
+  // terminar, guarda la regadera y vuelve al reposo.
+  private _actualizarRiego(dt: number): void {
+    this._riego = Math.max(0, this._riego - dt);
+    const t = 1 - this._riego / this._riegoTotal; // progreso 0..1
+    const vertiendo = this._riego > 0 && t > 0.33 && t < 0.8;
+    if (vertiendo) {
+      this._agua ??= this._crearAgua();
+      if (this._spoutTip) {
+        this._agua.emitter.copyFrom(this._spoutTip.getAbsolutePosition());
+      } else {
+        // Sin regadera: el agua cae delante del granjero, a media altura
+        const r = this.visual.rotation.y;
+        const p = this.root.position;
+        this._agua.emitter.copyFromFloats(p.x + Math.sin(r) * 0.5, p.y, p.z + Math.cos(r) * 0.5);
+      }
+      if (!this._agua.isStarted()) this._agua.start();
+    } else if (this._agua?.isStarted()) {
+      this._agua.stop();
+    }
+    if (this._riego === 0) {
+      this._regadera?.setEnabled(false);
+      this._anims.water?.stop();
+      this._animActual = null;
+    }
   }
 
   get position(): any {
@@ -151,6 +249,10 @@ export class PlayerView {
   // directo al mundo: W/arriba = -z (alejarse, arriba en pantalla),
   // D/derecha = -x (derecha en pantalla).
   update(dt: number, keys: Record<string, boolean>, canMove: boolean): void {
+    if (this.busy) {
+      this._actualizarRiego(dt);
+      canMove = false;
+    }
     let ix = 0;
     let iz = 0;
     if (canMove) {
@@ -174,7 +276,7 @@ export class PlayerView {
     if (dx !== 0 || dz !== 0) {
       this.visual.rotation.y = Math.atan2(dx, dz);
     }
-    this._animar(dx !== 0 || dz !== 0);
+    if (!this.busy) this._animar(dx !== 0 || dz !== 0);
 
     // Red de seguridad: si algo raro lo lanza fuera del mundo, reaparece
     if (this.root.position.y < -2) {

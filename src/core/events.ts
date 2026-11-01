@@ -8,6 +8,7 @@ export const EVENTS = {
   DAY_NEW: 'day:new',
   FARM_CHANGED: 'farm:changed', // la parcela cambió (vista debe resincronizar)
   FARM_HARVESTED: 'farm:harvested',
+  FARM_WATERED: 'farm:watered', // se regó un surco (la vista anima el riego)
   ANIMALS_CHANGED: 'animals:changed', // los animales cambiaron (compra, comida, carga)
   INVENTORY_CHANGED: 'inventory:changed', // semillas/cosecha/regalos cambiaron
   MONEY_CHANGED: 'money:changed',
@@ -24,6 +25,7 @@ export type EventPayloads = {
   'day:new': { day: number };
   'farm:changed': void;
   'farm:harvested': { type: string };
+  'farm:watered': { index: number };
   'animals:changed': void;
   'inventory:changed': void;
   'money:changed': void;
