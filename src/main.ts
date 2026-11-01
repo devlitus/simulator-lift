@@ -33,6 +33,19 @@ import { NPC_DEFS } from '../data/npcs';
 import { QUEST_DEFS } from '../data/quests';
 
 import { TREE_SPOTS, WorldView } from './world/worldView';
+import { canSleep } from './world/sleep';
+import { canEnterDoor, DOOR_SPOT } from './world/farmerPorch';
+import { HomeInteriorView } from './world/homeInteriorView';
+import {
+  BED_WAKE,
+  canReachBed,
+  canReachExit,
+  FARMER_BED,
+  HOME_INTERIOR,
+  INTERIOR_ENTRY,
+  INTERIOR_EXIT,
+  isIndoors,
+} from './world/homeInterior';
 import { SceneryView } from './world/sceneryView';
 import { PlayerView } from './player/playerView';
 import { FarmLogic } from './crops/farmLogic';
@@ -56,6 +69,10 @@ const glRenderer = (engine.getGlInfo().renderer || '').toLowerCase();
 const lowSpec = /swiftshader|software|llvmpipe/.test(glRenderer);
 if (lowSpec) engine.setHardwareScalingLevel(2);
 
+// Mismo tope que el bucle principal: con pocos FPS, un paso de física de hasta
+// 1 s (el valor por defecto) haría atravesar muros y barreras al granjero.
+Scene.MaxDeltaTime = 100;
+
 // Física: Cannon.js (ligero, JS puro, suficiente para colisiones caja/estático)
 scene.enablePhysics(new Vector3(0, -9.81, 0), new CannonJSPlugin(true, 10, CANNON));
 
@@ -73,6 +90,7 @@ const quests = new QuestSystem(state, bus, QUEST_DEFS);
 // ---------- Vistas Babylon + UI ----------
 const world = new WorldView(scene, bus, { shadows: !lowSpec, pen: PEN });
 new SceneryView(scene, world, PEN, TREE_SPOTS);
+const homeInterior = new HomeInteriorView(scene);
 const player = new PlayerView(scene, world);
 const farmView = new FarmView(scene, state, bus, farmLogic, FARM_CONFIG, CROPS);
 const animalView = new AnimalView(scene, world, state, bus, animalLogic, ANIMALS, PEN);
@@ -94,12 +112,21 @@ const saveRepo = new SaveRepository(window.localStorage);
 // Distancia al punto de la manivela para poder girarla (el pozo, con su
 // colisión, impide acercarse más desde ese lado).
 const CRANK_RADIUS = 0.9;
+// Cruzar la puerta es más breve que dormir: basta un instante a oscuras.
+const DOOR_HOLD_MS = 150;
+// Dentro de casa la cámara no dibuja más allá de la estancia: el pueblo no se
+// ve y no cuesta nada.
+const INDOORS_MAX_Z = 60;
+const INDOORS_ZOOM = 13;
+// Encuadre fijo de la casa, algo al sur de su centro para que la pista no tape el frente
+const INDOORS_FOCUS = { x: HOME_INTERIOR.x, z: HOME_INTERIOR.z + 1.2 };
 
 // ---------- Cámara de seguimiento estilo Stardew ----------
 // Vista aérea con orientación fija (pitch 45°, mirando hacia -z): la cámara
 // sigue al personaje centrada, con suavizado exponencial, y nunca gira.
 // La rueda del ratón ajusta el zoom (acercar/alejar manteniendo el ángulo).
 const camera = new FreeCamera('cam', new Vector3(0, 12, 24), scene);
+const OUTDOORS_MAX_Z = camera.maxZ;
 const camTarget = new Vector3(0, 0, 12); // punto de mira, arranca en el jugador
 const camLookAt = new Vector3(0, 1, 12); // scratch para setTarget
 let camZoom: number = CONFIG.camZoomStart;
@@ -113,7 +140,9 @@ canvas.addEventListener('wheel', (e) => {
 });
 
 function updateCamera(dt: number): void {
-  const p = player.position;
+  // Dentro de casa, la cámara queda fija con toda la vivienda en el encuadre
+  const p = world.indoors ? INDOORS_FOCUS : player.position;
+  const zoom = world.indoors ? INDOORS_ZOOM : camZoom;
   // Suavizado de posición independiente del framerate (≈5/s)
   const alpha = 1 - Math.exp(-5 * dt);
   camTarget.x += (p.x - camTarget.x) * alpha;
@@ -121,7 +150,7 @@ function updateCamera(dt: number): void {
 
   // Altura = distancia → pitch de 45°. Mirar al objetivo suavizado (no al
   // jugador directo) mantiene la orientación exactamente fija.
-  camera.position.set(camTarget.x, camZoom, camTarget.z + camZoom);
+  camera.position.set(camTarget.x, zoom, camTarget.z + zoom);
   camLookAt.set(camTarget.x, 1, camTarget.z);
   camera.setTarget(camLookAt);
 }
@@ -157,6 +186,27 @@ function drawWater(): void {
   }
   const segundos = world.wellView.play(() => farmLogic.refillWater());
   player.playRefill(world.well, segundos);
+}
+
+// ---------- Casa: entrar, salir y dormir ----------
+// La puerta cambia de escenario: con la pantalla a oscuras el granjero pasa a
+// la estancia (homeInterior) o vuelve al porche, y la cámara va con él.
+function moveThroughDoor(x: number, z: number, heading: number): void {
+  ui.fadeToBlack(() => {
+    player.teleport(x, z, heading);
+    const foco = isIndoors(x, z) ? INDOORS_FOCUS : { x, z };
+    camTarget.x = foco.x;
+    camTarget.z = foco.z;
+  }, DOOR_HOLD_MS);
+}
+
+// Fundido a negro; con la pantalla a oscuras empieza el día siguiente y el
+// granjero despierta junto a la cama.
+function sleep(): void {
+  ui.fadeToBlack(() => {
+    world.sleep(state.day);
+    player.teleport(BED_WAKE.x, BED_WAKE.z);
+  });
 }
 
 // ---------- Ciclo de día nuevo ----------
@@ -200,6 +250,35 @@ function findInteraction(): Interaction | null {
     });
   }
 
+  if (canEnterDoor(p.x, p.z)) {
+    candidates.push({
+      dist: 0, // justo delante de la puerta no hay nada más que hacer
+      label: 'Intro ↵: Entrar en casa 🏠',
+      action: () => moveThroughDoor(INTERIOR_ENTRY.x, INTERIOR_ENTRY.z, Math.PI),
+      key: 'enter',
+    });
+  }
+
+  if (canReachExit(p.x, p.z)) {
+    candidates.push({
+      dist: Math.hypot(p.x - INTERIOR_EXIT.x, p.z - INTERIOR_EXIT.z),
+      label: 'Intro ↵: Salir de casa 🚪',
+      action: () => moveThroughDoor(DOOR_SPOT.x, DOOR_SPOT.z, 0),
+      key: 'enter',
+    });
+  }
+
+  if (canReachBed(p.x, p.z)) {
+    const puede = canSleep(world.getHour(), BALANCE.sleepFromHour);
+    candidates.push({
+      dist: Math.hypot(p.x - FARMER_BED.x, p.z - FARMER_BED.z),
+      label: puede
+        ? 'E: Dormir hasta mañana 🛏️'
+        : `🛏️ Tu cama — podrás dormir a partir de las ${BALANCE.sleepFromHour}:00`,
+      action: puede ? sleep : null,
+    });
+  }
+
   const well = world.well;
   const dWell = Math.hypot(p.x - well.x, p.z - well.z);
   if (dWell < CONFIG.interactionRadius || nearCrank()) {
@@ -233,9 +312,9 @@ window.addEventListener('keydown', (e) => {
   keys[k] = true;
   if (k.startsWith('arrow') || k === ' ') e.preventDefault();
 
-  if (k === 'e' && !e.repeat) {
+  if ((k === 'e' || k === 'enter') && !e.repeat) {
     const i = currentInteraction;
-    if (!ui.modalOpen && i && i.action && (i.key ?? 'e') === 'e') i.action();
+    if (!ui.modalOpen && i && i.action && (i.key ?? 'e') === k) i.action();
   } else if (k === 'p' && !e.repeat) {
     drawWater(); // el pozo responde a P aunque otra interacción ocupe la pista
   } else if (k === 'escape') {
@@ -281,7 +360,12 @@ else ui.toggleHelp(true); // primera vez: mostrar ayuda
 // ---------- Bucle principal ----------
 engine.runRenderLoop(() => {
   const dt = Math.min(engine.getDeltaTime() / 1000, 0.1); // tope anti-saltos
+  // Se deduce de la posición: el escenario no puede quedar desfasado del granjero
+  world.indoors = isIndoors(player.position.x, player.position.z);
+  camera.maxZ = world.indoors ? INDOORS_MAX_Z : OUTDOORS_MAX_Z;
+  document.body.classList.toggle('indoors', world.indoors); // el CSS oculta el HUD de fuera
   world.update(dt, state.day);
+  homeInterior.update(dt, world.daylight);
 
   const canMove = !ui.modalOpen && !player.busy;
   player.update(dt, keys, canMove);

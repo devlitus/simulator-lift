@@ -68,6 +68,7 @@ export const BalanceSchema = z.object({
   startSeeds: z.record(z.number().int().min(0)), // semillas iniciales por tipo de cultivo
   startFeed: z.number().int().min(0), // pienso inicial
   startAnimals: z.array(z.string()), // especies con las que empieza el jugador
+  sleepFromHour: z.number().min(6).max(24), // desde qué hora se puede dormir en casa
 });
 export type BalanceConfig = z.infer<typeof BalanceSchema>;
 

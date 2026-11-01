@@ -43,6 +43,7 @@ const CLEAR_ZONES: Rect[] = [
   { minX: -0.5, maxX: 8.5, minZ: -22.5, maxZ: -13.5 }, // casa de Lila
   { minX: -4, maxX: 4.5, minZ: -17.5, maxZ: -10.5 }, // jardín y ruta de Lila
   { minX: 7.5, maxX: 16.5, minZ: -12.5, maxZ: -3.5 }, // tienda de Marta
+  { minX: -10.5, maxX: -2.5, minZ: 11, maxZ: 19 }, // casa del granjero y su entrada
 ];
 
 // Generador pseudoaleatorio con semilla (mulberry32): el decorado es el

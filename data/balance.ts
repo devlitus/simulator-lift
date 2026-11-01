@@ -6,4 +6,5 @@ export const BALANCE: BalanceConfig = BalanceSchema.parse({
   startSeeds: { zanahoria: 3 }, // semillas con las que empieza el jugador
   startFeed: 3, // pienso con el que empieza el jugador
   startAnimals: ['gallina'], // animales con los que empieza el jugador
+  sleepFromHour: 18, // se puede dormir desde las 18:00 hasta el amanecer
 });

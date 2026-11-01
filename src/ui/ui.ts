@@ -29,6 +29,7 @@ export class GameUI {
   animals: Record<string, AnimalDef>;
   feedDef: FeedDef;
   el: Record<string, HTMLElement>;
+  sleeping = false; // fundido a negro en curso
 
   constructor(
     bus: EventBus,
@@ -71,6 +72,7 @@ export class GameUI {
       shopClose: $('shop-close'),
       help: $('help'),
       helpClose: $('help-close'),
+      sleepFade: $('sleep-fade'),
     };
 
     this.el.shopClose.addEventListener('click', (ev) => {
@@ -100,6 +102,7 @@ export class GameUI {
 
   get modalOpen(): boolean {
     return (
+      this.sleeping ||
       !this.el.dialog.classList.contains('hidden') ||
       !this.el.shop.classList.contains('hidden') ||
       !this.el.help.classList.contains('hidden')
@@ -200,6 +203,24 @@ export class GameUI {
     }
     this.el.hint.textContent = text;
     this.el.hint.classList.remove('hidden');
+  }
+
+  // ---------- Fundido (dormir, entrar y salir de casa) ----------
+
+  // Funde a negro, llama a `onDark` con la pantalla a oscuras, la mantiene
+  // `holdMs` y vuelve a aclarar. Mientras dura, cuenta como ventana abierta
+  // (sin input).
+  fadeToBlack(onDark: () => void, holdMs = 700): void {
+    if (this.sleeping) return;
+    this.sleeping = true;
+    this.el.sleepFade.classList.add('dark');
+    setTimeout(() => {
+      onDark();
+      setTimeout(() => {
+        this.el.sleepFade.classList.remove('dark');
+        setTimeout(() => (this.sleeping = false), 800);
+      }, holdMs);
+    }, 900);
   }
 
   // ---------- Notificaciones ----------

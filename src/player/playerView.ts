@@ -3,6 +3,7 @@
 // velocidad y reproduce las animaciones (caminar, reposo, regar). Mientras
 // gira la manivela del pozo se queda quieto mirándolo.
 import { CONFIG } from '../core/constants';
+import { floorHeightAt } from '../world/farmerPorch';
 import type { WorldView } from '../world/worldView';
 import { SceneLoader } from '@babylonjs/core/Loading/sceneLoader';
 import { DynamicTexture } from '@babylonjs/core/Materials/Textures/dynamicTexture';
@@ -14,6 +15,8 @@ import { TransformNode } from '@babylonjs/core/Meshes/transformNode';
 import { ParticleSystem } from '@babylonjs/core/Particles/particleSystem';
 import { PhysicsImpostor } from '@babylonjs/core/Physics/v1/physicsImpostor';
 import type { AnimationGroup, Mesh, Node, Scene } from '@babylonjs/core';
+
+const STEP_RATE = 14; // rapidez con la que los pies alcanzan la altura del peldaño (1/s)
 
 export class PlayerView {
   scene: Scene;
@@ -32,6 +35,7 @@ export class PlayerView {
   private _riego = 0; // segundos que faltan de la animación de riego
   private _riegoTotal = 0;
   private _recarga = 0; // segundos que faltan de girar la manivela
+  private _altura = 0; // altura de los pies sobre el césped (peldaños del porche)
 
   constructor(scene: Scene, world: WorldView) {
     this.scene = scene;
@@ -265,6 +269,15 @@ export class PlayerView {
     return this.root.position;
   }
 
+  // Coloca al granjero quieto en (x, z); por defecto, mirando a la cámara.
+  // La física copia la posición de la malla al cuerpo en el siguiente paso.
+  teleport(x: number, z: number, heading = 0): void {
+    this.root.position.set(x, 1.2, z);
+    this._imp.setLinearVelocity(Vector3.Zero());
+    this.visual.rotation.y = heading;
+    this._altura = floorHeightAt(x, z);
+  }
+
   // La cámara es fija (mira hacia -z desde +z), así que el input se mapea
   // directo al mundo: W/arriba = -z (alejarse, arriba en pantalla),
   // D/derecha = -x (derecha en pantalla).
@@ -296,6 +309,11 @@ export class PlayerView {
       this.visual.rotation.y = Math.atan2(dx, dz);
     }
     if (!this.busy) this._animar(dx !== 0 || dz !== 0);
+
+    // Sube los peldaños del porche con un paso suave (ver floorHeightAt)
+    const pisa = floorHeightAt(this.root.position.x, this.root.position.z);
+    this._altura += (pisa - this._altura) * (1 - Math.exp(-STEP_RATE * dt));
+    this.visual.position.y = -0.65 + this._altura;
 
     // Red de seguridad: si algo raro lo lanza fuera del mundo, reaparece
     if (this.root.position.y < -2) {
