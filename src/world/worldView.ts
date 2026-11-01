@@ -903,25 +903,93 @@ export class WorldView {
     // La antigua caja de ventas ya no existe: la sustituye el almacén del
     // granjero (buildStorage), que ocupa su lugar al este de la parcela.
 
-    // Jardín de flores de Lila (decorativo)
+    // Jardín de flores de Lila: los modelos se cargan de forma independiente
+    // para que un GLB defectuoso no deje el jardín vacío.
+    const spots = [
+      [-3, -13],
+      [-1.8, -13],
+      [-0.6, -13],
+      [-3, -14.2],
+      [-1.8, -14.2],
+      [-0.6, -14.2],
+    ];
+    const variants = [
+      'flor_margarita.glb',
+      'flor_tulipan.glb',
+      'flor_lavanda.glb',
+      'flor_amapola.glb',
+      'flor_campanilla.glb',
+    ];
+    for (const [index, [x, z]] of spots.entries()) {
+      this.buildFlower(x, z, variants[index % variants.length], index);
+    }
+  }
+
+  private buildFlower(x: number, z: number, variant: string, index: number): void {
+    const root = new BABYLON.TransformNode('lilaFlowerRoot', this.scene);
+    root.position.set(x, 0, z);
+    const prims: any[] = [];
+
+    // Respaldo visible durante la carga y ante un GLB inválido.
     const flowerColors = [
       this.mat(0.9, 0.3, 0.4),
       this.mat(0.95, 0.85, 0.3),
       this.mat(0.7, 0.4, 0.9),
     ];
-    for (let i = 0; i < 6; i++) {
-      const fx = -3 + (i % 3) * 1.2;
-      const fz = -13 - Math.floor(i / 3) * 1.2;
-      const stem = BABYLON.MeshBuilder.CreateCylinder(
-        'fstem',
-        { height: 0.5, diameter: 0.06 },
-        this.scene,
+    const stem = BABYLON.MeshBuilder.CreateCylinder(
+      'flowerFallbackStem',
+      { height: 0.5, diameter: 0.06 },
+      this.scene,
+    );
+    stem.parent = root;
+    stem.position.y = 0.25;
+    stem.material = this.mat(0.2, 0.55, 0.2);
+    prims.push(stem);
+    const head = BABYLON.MeshBuilder.CreateSphere(
+      'flowerFallbackHead',
+      { diameter: 0.28 },
+      this.scene,
+    );
+    head.parent = root;
+    head.position.y = 0.55;
+    head.material = flowerColors[index % flowerColors.length];
+    prims.push(head);
+    this.addShadow(stem);
+    this.addShadow(head);
+    void this._loadFlower(root, variant, prims);
+  }
+
+  private async _loadFlower(root: any, variant: string, prims: any[]): Promise<void> {
+    let imported: any = null;
+    try {
+      imported = await BABYLON.SceneLoader.ImportMeshAsync('', '/models/', variant, this.scene);
+      const model = imported.meshes[0];
+      if (!model) throw new Error('Flor sin malla raíz');
+      const { min, max } = model.getHierarchyBoundingVectors(true);
+      const height = max.y - min.y;
+      if (!Number.isFinite(height) || height <= 0) throw new Error('Flor sin dimensiones');
+      const scale = 0.86 / height;
+      model.parent = root;
+      model.scaling.scaleInPlace(scale);
+      model.position.set(
+        (-(min.x + max.x) / 2) * scale,
+        -min.y * scale,
+        (-(min.z + max.z) / 2) * scale,
       );
-      stem.position.set(fx, 0.25, fz);
-      stem.material = this.mat(0.2, 0.55, 0.2);
-      const head = BABYLON.MeshBuilder.CreateSphere('fhead', { diameter: 0.28 }, this.scene);
-      head.position.set(fx, 0.55, fz);
-      head.material = flowerColors[i % 3];
+      for (const mesh of imported.meshes) {
+        if (mesh.getTotalVertices() > 0) {
+          mesh.receiveShadows = true;
+          this.addShadow(mesh);
+        }
+      }
+      for (const prim of prims) {
+        this.shadow?.removeShadowCaster(prim);
+        prim.dispose();
+      }
+    } catch {
+      if (imported) {
+        for (const mesh of imported.meshes) mesh.dispose(false, true);
+      }
     }
   }
 
