@@ -15,6 +15,7 @@ import '@babylonjs/core/Physics/v1/physicsEngineComponent'; // impostores (físi
 import '@babylonjs/core/Lights/Shadows/shadowGeneratorSceneComponent'; // sombras
 import '@babylonjs/core/Particles/particleSystemComponent'; // partículas (riego)
 import '@babylonjs/core/Animations/animatable'; // AnimationGroup.start
+import '@babylonjs/core/Meshes/thinInstanceMesh'; // thin instances (decorado)
 import * as CANNON from 'cannon';
 
 import { CONFIG } from './core/constants';
@@ -31,7 +32,8 @@ import { GIFTS } from '../data/gifts';
 import { NPC_DEFS } from '../data/npcs';
 import { QUEST_DEFS } from '../data/quests';
 
-import { WorldView } from './world/worldView';
+import { TREE_SPOTS, WorldView } from './world/worldView';
+import { SceneryView } from './world/sceneryView';
 import { PlayerView } from './player/playerView';
 import { FarmLogic } from './crops/farmLogic';
 import { FarmView } from './crops/farmView';
@@ -70,6 +72,7 @@ const quests = new QuestSystem(state, bus, QUEST_DEFS);
 
 // ---------- Vistas Babylon + UI ----------
 const world = new WorldView(scene, bus, { shadows: !lowSpec, pen: PEN });
+new SceneryView(scene, world, PEN, TREE_SPOTS);
 const player = new PlayerView(scene, world);
 const farmView = new FarmView(scene, state, bus, farmLogic, FARM_CONFIG, CROPS);
 const animalView = new AnimalView(scene, world, state, bus, animalLogic, ANIMALS, PEN);

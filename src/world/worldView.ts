@@ -9,6 +9,7 @@ import { DirectionalLight } from '@babylonjs/core/Lights/directionalLight';
 import { HemisphericLight } from '@babylonjs/core/Lights/hemisphericLight';
 import { SceneLoader } from '@babylonjs/core/Loading/sceneLoader';
 import { StandardMaterial } from '@babylonjs/core/Materials/standardMaterial';
+import { Texture } from '@babylonjs/core/Materials/Textures/texture';
 import { Color3, Color4 } from '@babylonjs/core/Maths/math.color';
 import { Plane } from '@babylonjs/core/Maths/math.plane';
 import { Vector3 } from '@babylonjs/core/Maths/math.vector';
@@ -17,7 +18,8 @@ import { Mesh } from '@babylonjs/core/Meshes/mesh';
 import { MeshBuilder } from '@babylonjs/core/Meshes/meshBuilder';
 import { TransformNode } from '@babylonjs/core/Meshes/transformNode';
 import { PhysicsImpostor } from '@babylonjs/core/Physics/v1/physicsImpostor';
-import type { ISceneLoaderAsyncResult, Node, Scene } from '@babylonjs/core';
+import { Scene } from '@babylonjs/core/scene';
+import type { ISceneLoaderAsyncResult, Node } from '@babylonjs/core';
 
 interface PathTile {
   x: number;
@@ -38,6 +40,20 @@ const STORAGE = {
   doorWidth: 1.1,
   doorwayMargin: 0.4, // el corte se activa ya en el umbral de la puerta
 };
+// Árboles del pueblo; SceneryView no siembra decoración encima de ellos.
+export const TREE_SPOTS: number[][] = [
+  [8, 11],
+  [-10, 9],
+  [20, 3],
+  [-20, 3],
+  [7, -11],
+  [-7, -14],
+  [21, -12],
+  [-18, 12],
+  [14, 14],
+  [-16, -16],
+];
+
 // Recorta lo que queda por encima de 1.3 m (Babylon descarta y - 1.3 > 0)
 const STORAGE_CUT_PLANE = new Plane(0, 1, 0, -1.3);
 
@@ -63,6 +79,11 @@ export class WorldView {
     this.time = 0.08; // fracción del día transcurrida (0 = 06:00). Empieza ~08:00.
 
     scene.clearColor = new Color4(0.55, 0.78, 0.95, 1);
+    // Niebla del color del cielo: funde las colinas del horizonte con él.
+    scene.fogMode = Scene.FOGMODE_LINEAR;
+    scene.fogStart = 55;
+    scene.fogEnd = 150;
+    scene.fogColor = new Color3(0.55, 0.78, 0.95);
 
     // Luz ambiental + sol direccional (con sombras)
     this.hemi = new HemisphericLight('hemi', new Vector3(0, 1, 0), scene);
@@ -108,7 +129,16 @@ export class WorldView {
     const s = CONFIG.groundSize;
     const ground = MeshBuilder.CreateBox('ground', { width: s, height: 1, depth: s }, this.scene);
     ground.position.y = -0.5;
-    ground.material = this.mat(0.36, 0.62, 0.3);
+    // Césped pintado (ComfyUI, ver assets/escenario/) repetido cada 5 m y
+    // teñido por un mapa de variación que cubre todo el terreno una vez, para
+    // que no se note la repetición. Sin las texturas queda el verde liso.
+    const mat = this.mat(0.36, 0.62, 0.3);
+    const grass = new Texture('/textures/cesped.jpg', this.scene);
+    grass.uScale = grass.vScale = s / 5;
+    mat.diffuseTexture = grass;
+    mat.diffuseColor = new Color3(0.86, 0.9, 0.84);
+    mat.ambientTexture = new Texture('/textures/variacion_suelo.jpg', this.scene);
+    ground.material = mat;
     ground.receiveShadows = true;
     ground.physicsImpostor = new PhysicsImpostor(
       ground,
@@ -829,20 +859,8 @@ export class WorldView {
   }
 
   buildTrees(): void {
-    const spots = [
-      [8, 11],
-      [-10, 9],
-      [20, 3],
-      [-20, 3],
-      [7, -11],
-      [-7, -14],
-      [21, -12],
-      [-18, 12],
-      [14, 14],
-      [-16, -16],
-    ];
     const variants = ['arbol_01.glb', 'arbol_02.glb', 'arbol_03.glb'];
-    for (const [index, [x, z]] of spots.entries()) {
+    for (const [index, [x, z]] of TREE_SPOTS.entries()) {
       this.buildTree(x, z, variants[index % variants.length]);
     }
   }
@@ -1128,5 +1146,7 @@ export class WorldView {
       0.16 + (0.95 - 0.16) * f,
       1,
     );
+    const sky = this.scene.clearColor;
+    this.scene.fogColor.copyFromFloats(sky.r, sky.g, sky.b);
   }
 }
