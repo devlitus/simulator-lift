@@ -49,13 +49,13 @@ bpy.ops.object.transform_apply(rotation=True)
 
 ## Paso 5 — Integración en el juego
 
-- Los `*View.ts` cargan con `BABYLON.SceneLoader.ImportMeshAsync('', '/models/', '<nombre>.glb', scene)` y **siempre con fallback** a primitivas si la carga falla (ver `src/player/playerView.ts:_loadFarmer`).
+- Los `*View.ts` cargan con `SceneLoader.ImportMeshAsync('', '/models/', '<nombre>.glb', scene)` y **siempre con fallback** a primitivas si la carga falla (ver `src/player/playerView.ts:_loadFarmer`). Babylon se importa por ruta desde npm (ADR 0010): `SceneLoader` de `@babylonjs/core/Loading/sceneLoader`, `Vector3` de `@babylonjs/core/Maths/math.vector`.
 - Escalar y apoyar en el suelo con la caja envolvente real, nunca constantes a medida del modelo:
 
 ```ts
 const { min, max } = model.getHierarchyBoundingVectors(true);
 const escala = ALTURA_OBJETIVO / (max.y - min.y);
-model.scaling = new BABYLON.Vector3(escala, escala, escala);
+model.scaling = new Vector3(escala, escala, escala);
 model.position.y = -min.y * escala;
 ```
 

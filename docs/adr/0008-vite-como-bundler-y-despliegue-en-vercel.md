@@ -1,6 +1,6 @@
 # 0008 — Vite como bundler y dev-server, con despliegue en Vercel
 
-**Estado:** Aceptada · Sustituye parcialmente a [0003](0003-javascript-con-jsdoc-en-vez-de-typescript.md) (la parte de «sin paso de build»)
+**Estado:** Aceptada · Sustituye parcialmente a [0003](0003-javascript-con-jsdoc-en-vez-de-typescript.md) (la parte de «sin paso de build») · La parte de Babylon/Cannon vendorizados la sustituye [0010](0010-babylon-y-cannon-desde-npm.md)
 
 ## Contexto
 

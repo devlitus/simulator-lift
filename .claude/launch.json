@@ -6,6 +6,12 @@
       "runtimeExecutable": "pnpm.cmd",
       "runtimeArgs": ["dev"],
       "port": 5173
+    },
+    {
+      "name": "preview",
+      "runtimeExecutable": "pnpm.cmd",
+      "runtimeArgs": ["preview", "--port", "4173", "--strictPort"],
+      "port": 4173
     }
   ]
 }

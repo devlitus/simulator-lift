@@ -7,31 +7,45 @@ import { TILE_STATUS, FarmLogic, type TileStatus } from './farmLogic';
 import type { GameState } from '../core/store';
 import type { CropDef, FarmConfig } from '../../data/schemas';
 import type { Interaction } from '../core/types';
+import { SceneLoader } from '@babylonjs/core/Loading/sceneLoader';
+import { PBRMaterial } from '@babylonjs/core/Materials/PBR/pbrMaterial';
+import { StandardMaterial } from '@babylonjs/core/Materials/standardMaterial';
+import { Color3 } from '@babylonjs/core/Maths/math.color';
+import { MeshBuilder } from '@babylonjs/core/Meshes/meshBuilder';
+import { TransformNode } from '@babylonjs/core/Meshes/transformNode';
+import type {
+  AbstractMesh,
+  ISceneLoaderAsyncResult,
+  Material,
+  Mesh,
+  Node,
+  Scene,
+} from '@babylonjs/core';
 
 interface FarmTile {
-  mesh: any;
+  mesh: Mesh | null; // caja de respaldo hasta que carga el GLB
   x: number;
   z: number;
-  cropMeshes: any[];
-  modelRoot: any | null;
-  modelMaterials: any[];
+  cropMeshes: Mesh[];
+  modelRoot: TransformNode | null;
+  modelMaterials: Material[];
 }
 
 export class FarmView {
-  scene: any;
+  scene: Scene;
   state: GameState;
   logic: FarmLogic;
   cfg: FarmConfig;
   crops: Record<string, CropDef>;
   tiles: FarmTile[];
-  soilMat: any;
-  soilWetMat: any;
-  stemMat: any;
-  witherMat: any;
-  cropMats: Record<string, any>;
+  soilMat: StandardMaterial;
+  soilWetMat: StandardMaterial;
+  stemMat: StandardMaterial;
+  witherMat: StandardMaterial;
+  cropMats: Record<string, StandardMaterial>;
 
   constructor(
-    scene: any,
+    scene: Scene,
     state: GameState,
     bus: EventBus,
     logic: FarmLogic,
@@ -56,7 +70,7 @@ export class FarmView {
       for (let c = 0; c < cols; c++) {
         const x = origin.x + c * spacing;
         const z = origin.z + r * spacing;
-        const mesh = BABYLON.MeshBuilder.CreateBox(
+        const mesh = MeshBuilder.CreateBox(
           `soil_${r}_${c}`,
           { width: tileSize, height: 0.12, depth: tileSize },
           scene,
@@ -77,17 +91,17 @@ export class FarmView {
   // Descarga el módulo de tierra una sola vez y crea un clon por surco. Las
   // cajas siguen siendo el respaldo si el GLB o el cargador no están disponibles.
   async loadTileModel(): Promise<void> {
-    let imported: any = null;
-    const roots: any[] = [];
+    let imported: ISceneLoaderAsyncResult | null = null;
+    const roots: TransformNode[] = [];
     try {
-      imported = await BABYLON.SceneLoader.ImportMeshAsync(
+      imported = await SceneLoader.ImportMeshAsync(
         '',
         '/models/',
         'parcela_plantacion.glb',
         this.scene,
       );
       const template = imported.meshes[0];
-      if (!template || !imported.meshes.some((m: any) => m.getTotalVertices() > 0)) {
+      if (!template || !imported.meshes.some((m) => m.getTotalVertices() > 0)) {
         throw new Error('Parcela sin malla');
       }
 
@@ -100,7 +114,7 @@ export class FarmView {
 
       for (let i = 0; i < this.tiles.length; i++) {
         const tile = this.tiles[i];
-        const root = new BABYLON.TransformNode(`soil_model_${i}`, this.scene);
+        const root = new TransformNode(`soil_model_${i}`, this.scene);
         root.scaling.set(scale, scale, scale);
         root.position.set(
           tile.x - ((min.x + max.x) / 2) * scale,
@@ -110,15 +124,16 @@ export class FarmView {
         template.instantiateHierarchy(
           root,
           { doNotInstantiate: true },
-          (source: any, clone: any) => {
+          (source: Node, clone: Node) => {
             clone.setEnabled(true);
+            if (!isMesh(source) || !isMesh(clone)) return;
             clone.receiveShadows = true;
             if (source.material) {
               const material = source.material.clone(
                 `soil_model_mat_${i}_${tile.modelMaterials.length}`,
               );
               clone.material = material;
-              tile.modelMaterials.push(material);
+              if (material) tile.modelMaterials.push(material);
             }
           },
         );
@@ -128,7 +143,7 @@ export class FarmView {
 
       for (const mesh of imported.meshes) mesh.setEnabled(false);
       for (const tile of this.tiles) {
-        tile.mesh.dispose();
+        tile.mesh?.dispose();
         tile.mesh = null;
       }
       this.sync();
@@ -141,18 +156,18 @@ export class FarmView {
     }
   }
 
-  makeMat(r: number, g: number, b: number): any {
-    const m = new BABYLON.StandardMaterial('cmat', this.scene);
-    m.diffuseColor = new BABYLON.Color3(r, g, b);
-    m.specularColor = BABYLON.Color3.Black();
+  makeMat(r: number, g: number, b: number): StandardMaterial {
+    const m = new StandardMaterial('cmat', this.scene);
+    m.diffuseColor = new Color3(r, g, b);
+    m.specularColor = Color3.Black();
     return m;
   }
 
-  cropMat(type: string): any {
+  cropMat(type: string): StandardMaterial {
     if (!this.cropMats[type]) {
-      const m = new BABYLON.StandardMaterial(`crop_${type}`, this.scene);
-      m.diffuseColor = BABYLON.Color3.FromHexString(this.crops[type].color);
-      m.specularColor = BABYLON.Color3.Black();
+      const m = new StandardMaterial(`crop_${type}`, this.scene);
+      m.diffuseColor = Color3.FromHexString(this.crops[type].color);
+      m.specularColor = Color3.Black();
       this.cropMats[type] = m;
     }
     return this.cropMats[type];
@@ -174,14 +189,14 @@ export class FarmView {
     this.setTileWetness(t, Boolean(crop?.watered));
     if (!crop) return;
 
-    const add = (mesh: any) => {
+    const add = (mesh: Mesh) => {
       t.cropMeshes.push(mesh);
       return mesh;
     };
 
     if (status.kind === TILE_STATUS.WITHERED) {
       const stem = add(
-        BABYLON.MeshBuilder.CreateCylinder('wstem', { height: 0.35, diameter: 0.08 }, this.scene),
+        MeshBuilder.CreateCylinder('wstem', { height: 0.35, diameter: 0.08 }, this.scene),
       );
       stem.position.set(t.x, 0.3, t.z);
       stem.rotation.z = 0.7;
@@ -194,13 +209,13 @@ export class FarmView {
     const h = 0.18 + 0.55 * ratio; // altura según etapa de crecimiento
 
     const stem = add(
-      BABYLON.MeshBuilder.CreateCylinder('cstem', { height: h, diameter: 0.09 }, this.scene),
+      MeshBuilder.CreateCylinder('cstem', { height: h, diameter: 0.09 }, this.scene),
     );
     stem.position.set(t.x, 0.12 + h / 2, t.z);
     stem.material = this.stemMat;
 
     const leaves = add(
-      BABYLON.MeshBuilder.CreateSphere('cleaf', { diameter: 0.25 + 0.25 * ratio }, this.scene),
+      MeshBuilder.CreateSphere('cleaf', { diameter: 0.25 + 0.25 * ratio }, this.scene),
     );
     leaves.position.set(t.x, 0.12 + h, t.z);
     leaves.material = this.stemMat;
@@ -214,9 +229,7 @@ export class FarmView {
         [0, 1.05, 0],
       ];
       for (const [ox, oy, oz] of offsets) {
-        const fruit = add(
-          BABYLON.MeshBuilder.CreateSphere('cfruit', { diameter: 0.26 }, this.scene),
-        );
+        const fruit = add(MeshBuilder.CreateSphere('cfruit', { diameter: 0.26 }, this.scene));
         fruit.position.set(t.x + ox, 0.12 + h * oy, t.z + oz);
         fruit.material = mat;
       }
@@ -226,10 +239,10 @@ export class FarmView {
   // Cada instancia recibe su propio material al clonar. Así solo se oscurece
   // la parcela regada, sin alterar las demás ni perder el atlas PBR del GLB.
   setTileWetness(tile: FarmTile, watered: boolean): void {
-    const tone = watered ? new BABYLON.Color3(0.58, 0.58, 0.64) : BABYLON.Color3.White();
+    const tone = watered ? new Color3(0.58, 0.58, 0.64) : Color3.White();
     for (const material of tile.modelMaterials) {
-      if (material.albedoColor) material.albedoColor = tone;
-      else if (material.diffuseColor) material.diffuseColor = tone;
+      if (material instanceof PBRMaterial) material.albedoColor = tone;
+      else if (material instanceof StandardMaterial) material.diffuseColor = tone;
     }
   }
 
@@ -291,4 +304,8 @@ export class FarmView {
       }
     }
   }
+}
+
+function isMesh(node: Node): node is AbstractMesh {
+  return 'getTotalVertices' in node;
 }

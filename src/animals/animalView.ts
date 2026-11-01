@@ -9,33 +9,48 @@ import type { WorldView } from '../world/worldView';
 import type { Animal, AnimalLogic } from './animalLogic';
 import type { AnimalDef, PenConfig } from '../../data/schemas';
 import type { Interaction } from '../core/types';
+import { SceneLoader } from '@babylonjs/core/Loading/sceneLoader';
+import { StandardMaterial } from '@babylonjs/core/Materials/standardMaterial';
+import { Axis } from '@babylonjs/core/Maths/math.axis';
+import { Color3 } from '@babylonjs/core/Maths/math.color';
+import { Quaternion } from '@babylonjs/core/Maths/math.vector';
+import { MeshBuilder } from '@babylonjs/core/Meshes/meshBuilder';
+import { TransformNode } from '@babylonjs/core/Meshes/transformNode';
+import type {
+  AnimationGroup,
+  ISceneLoaderAsyncResult,
+  Mesh,
+  Node,
+  Scene,
+  Skeleton,
+} from '@babylonjs/core';
 
 interface AnimalVisual {
-  root: any;
+  root: TransformNode;
   tx: number; // objetivo de paseo
   tz: number;
   pause: number; // segundos quieto antes de buscar otro rincón
-  anims?: { walk?: any; idle?: any }; // grupos clonados por instancia (oveja)
+  anims?: { walk?: AnimationGroup; idle?: AnimationGroup }; // grupos clonados por instancia (oveja)
   animActual?: string | null;
-  skeleton?: any; // esqueleto clonado por instancia (oveja)
+  skeleton?: Skeleton; // esqueleto clonado por instancia (oveja)
 }
 
 const SPEED = 0.8; // unidades/segundo (más lento que el jugador y los NPCs)
 const MARGIN = 0.8; // distancia mínima a la valla al pasear
 
 export class AnimalView {
-  scene: any;
+  scene: Scene;
   world: WorldView;
   state: GameState;
   logic: AnimalLogic;
   defs: Record<string, AnimalDef>;
   pen: PenConfig;
   visuals: Map<Animal, AnimalVisual>;
-  mats: Record<string, any>;
-  modelCache: Record<string, Promise<any>>;
+  mats: Record<string, StandardMaterial>;
+  modelCache: Record<string, Promise<ISceneLoaderAsyncResult>>;
 
   constructor(
-    scene: any,
+    scene: Scene,
     world: WorldView,
     state: GameState,
     bus: EventBus,
@@ -57,11 +72,11 @@ export class AnimalView {
     bus.on(EVENTS.ANIMALS_CHANGED, () => this.syncMeshes());
   }
 
-  mat(hex: string): any {
+  mat(hex: string): StandardMaterial {
     if (!this.mats[hex]) {
-      const m = new BABYLON.StandardMaterial(`amat_${hex}`, this.scene);
-      m.diffuseColor = BABYLON.Color3.FromHexString(hex);
-      m.specularColor = BABYLON.Color3.Black();
+      const m = new StandardMaterial(`amat_${hex}`, this.scene);
+      m.diffuseColor = Color3.FromHexString(hex);
+      m.specularColor = Color3.Black();
       this.mats[hex] = m;
     }
     return this.mats[hex];
@@ -85,9 +100,9 @@ export class AnimalView {
       if (!alive.has(animal)) {
         // Liberar animación y esqueleto clonados de la instancia (oveja)
         if (v.anims) {
-          for (const g of Object.values(v.anims)) (g as any)?.dispose?.();
+          for (const g of Object.values(v.anims)) g?.dispose();
         }
-        v.skeleton?.dispose?.();
+        v.skeleton?.dispose();
         v.root.dispose();
         this.visuals.delete(animal);
       }
@@ -180,18 +195,18 @@ export class AnimalView {
 
   // ---------- Fábricas de primitivas por especie ----------
 
-  buildAnimal(type: string): any {
+  buildAnimal(type: string): TransformNode {
     if (type === 'vaca') return this.buildCow();
     if (type === 'oveja') return this.buildSheep();
     if (type === 'gallina') return this.buildChicken();
     throw new Error(`especie de animal desconocida: ${type}`);
   }
 
-  buildCow(): any {
-    const root = new BABYLON.TransformNode('cow', this.scene);
+  buildCow(): TransformNode {
+    const root = new TransformNode('cow', this.scene);
     const bodyMat = this.mat(this.defs['vaca'].color);
 
-    const body = BABYLON.MeshBuilder.CreateBox(
+    const body = MeshBuilder.CreateBox(
       'cowBody',
       { width: 1.25, height: 0.75, depth: 0.65 },
       this.scene,
@@ -201,7 +216,7 @@ export class AnimalView {
     body.material = bodyMat;
     this.world.addShadow(body);
 
-    const head = BABYLON.MeshBuilder.CreateBox(
+    const head = MeshBuilder.CreateBox(
       'cowHead',
       { width: 0.42, height: 0.42, depth: 0.4 },
       this.scene,
@@ -211,7 +226,7 @@ export class AnimalView {
     head.material = bodyMat;
     this.world.addShadow(head);
 
-    const muzzle = BABYLON.MeshBuilder.CreateBox(
+    const muzzle = MeshBuilder.CreateBox(
       'cowMuzzle',
       { width: 0.2, height: 0.22, depth: 0.3 },
       this.scene,
@@ -220,18 +235,14 @@ export class AnimalView {
     muzzle.position.set(1.05, 0.95, 0);
     muzzle.material = this.mat('#bf8c73');
 
-    const legs: any[] = [];
+    const legs: Mesh[] = [];
     for (const [lx, lz] of [
       [-0.45, -0.22],
       [-0.45, 0.22],
       [0.45, -0.22],
       [0.45, 0.22],
     ]) {
-      const leg = BABYLON.MeshBuilder.CreateCylinder(
-        'cowLeg',
-        { height: 0.5, diameter: 0.14 },
-        this.scene,
-      );
+      const leg = MeshBuilder.CreateCylinder('cowLeg', { height: 0.5, diameter: 0.14 }, this.scene);
       leg.parent = root;
       leg.position.set(lx, 0.25, lz);
       leg.material = bodyMat;
@@ -247,16 +258,16 @@ export class AnimalView {
     return root;
   }
 
-  buildSheep(): any {
-    const root = new BABYLON.TransformNode('sheep', this.scene);
+  buildSheep(): TransformNode {
+    const root = new TransformNode('sheep', this.scene);
 
-    const body = BABYLON.MeshBuilder.CreateSphere('sheepBody', { diameter: 0.95 }, this.scene);
+    const body = MeshBuilder.CreateSphere('sheepBody', { diameter: 0.95 }, this.scene);
     body.parent = root;
     body.position.y = 0.55;
     body.material = this.mat(this.defs['oveja'].color);
     this.world.addShadow(body);
 
-    const head = BABYLON.MeshBuilder.CreateBox(
+    const head = MeshBuilder.CreateBox(
       'sheepHead',
       { width: 0.3, height: 0.3, depth: 0.26 },
       this.scene,
@@ -275,22 +286,22 @@ export class AnimalView {
     return root;
   }
 
-  buildChicken(): any {
-    const root = new BABYLON.TransformNode('chicken', this.scene);
+  buildChicken(): TransformNode {
+    const root = new TransformNode('chicken', this.scene);
     const bodyMat = this.mat(this.defs['gallina'].color);
 
-    const body = BABYLON.MeshBuilder.CreateSphere('chickenBody', { diameter: 0.34 }, this.scene);
+    const body = MeshBuilder.CreateSphere('chickenBody', { diameter: 0.34 }, this.scene);
     body.parent = root;
     body.position.y = 0.22;
     body.material = bodyMat;
     this.world.addShadow(body);
 
-    const head = BABYLON.MeshBuilder.CreateSphere('chickenHead', { diameter: 0.18 }, this.scene);
+    const head = MeshBuilder.CreateSphere('chickenHead', { diameter: 0.18 }, this.scene);
     head.parent = root;
     head.position.set(0.16, 0.42, 0);
     head.material = bodyMat;
 
-    const beak = BABYLON.MeshBuilder.CreateBox(
+    const beak = MeshBuilder.CreateBox(
       'chickenBeak',
       { width: 0.1, height: 0.05, depth: 0.05 },
       this.scene,
@@ -299,7 +310,7 @@ export class AnimalView {
     beak.position.set(0.28, 0.4, 0);
     beak.material = this.mat('#f2991f');
 
-    const comb = BABYLON.MeshBuilder.CreateBox(
+    const comb = MeshBuilder.CreateBox(
       'chickenComb',
       { width: 0.06, height: 0.08, depth: 0.1 },
       this.scene,
@@ -328,22 +339,19 @@ export class AnimalView {
   // Convención del modelo: pies en y=0, mirando hacia +x (ver update()).
   private _modelSeq = 0;
   private async loadModel(
-    root: any,
+    root: TransformNode,
     file: string,
-    primitives: any[],
-    onModel?: (model: any, res: any) => void,
+    primitives: Mesh[],
+    onModel?: (model: TransformNode, res: ISceneLoaderAsyncResult) => void,
     clonar = false,
   ): Promise<void> {
     try {
-      this.modelCache[file] ??= BABYLON.SceneLoader.ImportMeshAsync(
-        '',
-        '/models/',
-        file,
-        this.scene,
-      ).then((res: any) => {
-        res.meshes[0].setEnabled(false);
-        return res;
-      });
+      this.modelCache[file] ??= SceneLoader.ImportMeshAsync('', '/models/', file, this.scene).then(
+        (res) => {
+          res.meshes[0].setEnabled(false);
+          return res;
+        },
+      );
       const cached = await this.modelCache[file];
       const template = cached.meshes[0];
       // Sin clonar: instantiateHierarchy crea InstancedMesh (rápido, pero
@@ -351,6 +359,7 @@ export class AnimalView {
       const model = clonar
         ? template.clone(`${file}_${this._modelSeq++}`, null, false)
         : template.instantiateHierarchy();
+      if (!model) throw new Error(`No se pudo copiar ${file}`);
       model.parent = root;
       model.setEnabled(true);
       for (const m of model.getChildMeshes()) {
@@ -372,7 +381,12 @@ export class AnimalView {
   // diestro→zurdo), así que un fichero que mira hacia +x aparece mirando
   // hacia -x en el juego (caso de la oveja). Los ficheros que ya miran
   // hacia -x (vaca) no lo necesitan.
-  private _attachAnims(root: any, model: any, res: any, medioGiro: boolean): void {
+  private _attachAnims(
+    root: TransformNode,
+    model: TransformNode,
+    res: ISceneLoaderAsyncResult,
+    medioGiro: boolean,
+  ): void {
     const visual = [...this.visuals.values()].find((v) => v.root === root);
     if (!visual) return;
     const tplSkel = (res.skeletons ?? [])[0];
@@ -383,27 +397,25 @@ export class AnimalView {
       // otro medio giro vía cuaternio (manda sobre `rotation`) para que mire
       // hacia +x como el resto de modelos. Rotación propia: no altera
       // geometría ni culling.
-      const giro = BABYLON.Quaternion.RotationAxis(BABYLON.Axis.Y, Math.PI);
-      model.rotationQuaternion = (
-        model.rotationQuaternion ?? BABYLON.Quaternion.Identity()
-      ).multiply(giro);
+      const giro = Quaternion.RotationAxis(Axis.Y, Math.PI);
+      model.rotationQuaternion = (model.rotationQuaternion ?? Quaternion.Identity()).multiply(giro);
     }
     // La plantilla queda parada: solo los clones por instancia animan.
     // (El cargador glTF arranca el primer grupo solo.)
     for (const g of grupos) g.stop?.();
     // Mesh.clone conserva los nombres: mapa de este modelo por nombre
     // (con fallback al prefijo "Clone of " de instantiateHierarchy).
-    const porNombre = new Map<string, any>();
+    const porNombre = new Map<string, Node>();
     porNombre.set(model.name, model);
     for (const d of model.getDescendants(false)) porNombre.set(d.name, d);
-    const buscar = (nombre: string): any =>
+    const buscar = (nombre: string): Node | undefined =>
       porNombre.get(nombre) ?? porNombre.get(`Clone of ${nombre}`);
     let esqueleto = tplSkel;
     if (typeof tplSkel.clone === 'function') {
       esqueleto = tplSkel.clone(`${model.name}_skeleton`);
       for (const hueso of esqueleto.bones ?? []) {
         const nodo = buscar(hueso.name);
-        if (nodo && typeof hueso.linkTransformNode === 'function') {
+        if (nodo instanceof TransformNode) {
           hueso.linkTransformNode(nodo);
         }
       }
@@ -418,7 +430,7 @@ export class AnimalView {
       const nombre = (g.name ?? '').toLowerCase();
       const clave = nombre.includes('walk') ? 'walk' : nombre.includes('idle') ? 'idle' : null;
       if (!clave || typeof g.clone !== 'function') continue;
-      const clon = g.clone(`${model.name}_${clave}`, (viejo: any) => buscar(viejo.name) ?? viejo);
+      const clon = g.clone(`${model.name}_${clave}`, (viejo: Node) => buscar(viejo.name) ?? viejo);
       clon.stop();
       visual.anims[clave as 'walk' | 'idle'] = clon;
     }

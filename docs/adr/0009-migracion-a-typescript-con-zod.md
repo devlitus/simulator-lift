@@ -1,6 +1,6 @@
 # 0009 — Migración a TypeScript con esquemas Zod para el contenido
 
-**Estado:** Aceptada · Sustituye a [0003](0003-javascript-con-jsdoc-en-vez-de-typescript.md)
+**Estado:** Aceptada · Sustituye a [0003](0003-javascript-con-jsdoc-en-vez-de-typescript.md) · El punto 5 (Babylon/Cannon como `any`) lo actualiza [0010](0010-babylon-y-cannon-desde-npm.md)
 
 ## Contexto
 

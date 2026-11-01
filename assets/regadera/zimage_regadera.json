@@ -2,22 +2,10 @@
   "3": {
     "class_type": "KSampler",
     "inputs": {
-      "model": [
-        "11",
-        0
-      ],
-      "positive": [
-        "27",
-        0
-      ],
-      "negative": [
-        "33",
-        0
-      ],
-      "latent_image": [
-        "13",
-        0
-      ],
+      "model": ["11", 0],
+      "positive": ["27", 0],
+      "negative": ["33", 0],
+      "latent_image": ["13", 0],
       "seed": 1711010001,
       "steps": 8,
       "cfg": 1.0,
@@ -29,33 +17,21 @@
   "8": {
     "class_type": "VAEDecode",
     "inputs": {
-      "samples": [
-        "3",
-        0
-      ],
-      "vae": [
-        "29",
-        0
-      ]
+      "samples": ["3", 0],
+      "vae": ["29", 0]
     }
   },
   "9": {
     "class_type": "SaveImage",
     "inputs": {
-      "images": [
-        "8",
-        0
-      ],
+      "images": ["8", 0],
       "filename_prefix": "regadera_referencia"
     }
   },
   "11": {
     "class_type": "ModelSamplingAuraFlow",
     "inputs": {
-      "model": [
-        "28",
-        0
-      ],
+      "model": ["28", 0],
       "shift": 3.0
     }
   },
@@ -71,10 +47,7 @@
     "class_type": "CLIPTextEncode",
     "inputs": {
       "text": "A single stylized low-poly metal watering can, rounded cylindrical sage-green body with a darker green rim band, a curved arched handle on top, a long thin straight spout angled upward from the lower front ending in a round perforated brass sprinkler rose. Cozy hand-painted matte 3D farming-game prop, readable chunky silhouette, clean side view with the spout pointing to the right. Soft diffused studio light from upper left. Plain light gray studio background, centered composition, entire object visible with generous margins, no water, no ground platform, no plants, no people, no text, no logo.",
-      "clip": [
-        "30",
-        0
-      ]
+      "clip": ["30", 0]
     }
   },
   "28": {
@@ -101,10 +74,7 @@
   "33": {
     "class_type": "ConditioningZeroOut",
     "inputs": {
-      "conditioning": [
-        "27",
-        0
-      ]
+      "conditioning": ["27", 0]
     }
   }
 }

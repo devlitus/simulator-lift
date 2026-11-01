@@ -4,7 +4,7 @@ Este archivo proporciona las instrucciones para los agentes que trabajen en este
 
 ## Qué es
 
-Simulador de vida tipo pueblo en 3D (estilo Stardew Valley) con Babylon.js: granja, NPCs con amistad, misiones y economía. **TypeScript estricto + Vite** (ADR 0008/0009); el gestor de paquetes es **pnpm**. Babylon.js 9.17.0 y Cannon.js están vendorizados en `public/vendor/` como scripts UMD (globales `BABYLON` y `CANNON`, declarados como `any` en `src/global.d.ts`) — Vite los copia tal cual sin empaquetarlos. El despliegue objetivo es Vercel (detecta Vite y publica `dist/`).
+Simulador de vida tipo pueblo en 3D (estilo Stardew Valley) con Babylon.js: granja, NPCs con amistad, misiones y economía. **TypeScript estricto + Vite** (ADR 0008/0009); el gestor de paquetes es **pnpm**. Babylon.js 9.17.0 (`@babylonjs/core` y `@babylonjs/loaders`) y Cannon.js 0.6.2 vienen de npm como módulos ES con tipos reales (ADR 0010). Las vistas importan Babylon **por ruta** (`@babylonjs/core/Meshes/meshBuilder`…) para que Vite descarte lo que no se usa, y los tipos con `import type` desde `@babylonjs/core`; los componentes que solo se registran como efecto lateral (cargador glTF, física, sombras, partículas, animatables) se importan juntos en `src/main.ts`. El despliegue objetivo es Vercel (detecta Vite y publica `dist/`).
 
 El idioma del proyecto es el español: comentarios, docs y textos de juego se escriben en español.
 
@@ -24,7 +24,7 @@ pnpm verify        # gate completo: format:check + lint + typecheck + test
 
 ## Arquitectura
 
-Regla central (ADR 0001): **la lógica de dominio no importa BABYLON nunca**. `farmLogic.ts`, `animalLogic.ts`, `economy.ts`, `friendship.ts` y `questSystem.ts` son clases puras que operan sobre el estado y el bus, y son lo único que se testea con Vitest (tests colocados como `*.test.ts` junto al código). Además, `src/scenarios/` contiene tests de **escenario** (aceptación): recorren bucles completos de juego con los datos reales de `data/` (ciclo económico, misiones) y codifican criterios de issues; al añadir una mecánica nueva, añade su escenario. Los archivos `*View.ts` (farmView, animalView, npcView, playerView, worldView) contienen los meshes de Babylon y no llevan reglas de juego; se verifican a mano en el navegador (ADR 0006). Los objetos de Babylon se tipan como `any` (UMD sin tipos).
+Regla central (ADR 0001): **la lógica de dominio no importa BABYLON nunca**. `farmLogic.ts`, `animalLogic.ts`, `economy.ts`, `friendship.ts` y `questSystem.ts` son clases puras que operan sobre el estado y el bus, y son lo único que se testea con Vitest (tests colocados como `*.test.ts` junto al código). Además, `src/scenarios/` contiene tests de **escenario** (aceptación): recorren bucles completos de juego con los datos reales de `data/` (ciclo económico, misiones) y codifican criterios de issues; al añadir una mecánica nueva, añade su escenario. Los archivos `*View.ts` (farmView, animalView, npcView, playerView, worldView) contienen los meshes de Babylon y no llevan reglas de juego; se verifican a mano en el navegador (ADR 0006). Los objetos de Babylon usan sus tipos reales; `no-explicit-any` es error en ESLint.
 
 Comunicación entre sistemas: `EventBus` (Observer) **tipado** — el mapa `EventPayloads` de `src/core/events.ts` asocia cada evento de `EVENTS` a su payload (ADR 0002). Los sistemas de dominio emiten eventos; vistas y UI se suscriben. El estado central (`GameState`, un objeto plano mutable) se define y construye en `src/core/store.ts` y se pasa por referencia a todos los sistemas; se descartó Zustand por no aportar sobre este patrón (ADR 0009).
 
@@ -44,6 +44,6 @@ Todo el contenido y balance del juego vive en `data/` como datos (ADR 0004): cul
 - El estado de tareas a medias (issues) vive en `.kimi-code/state/`, un archivo por issue; se actualiza con el skill `pausar` al dejar trabajo a medias, se consulta con `retomar`, y se borra cuando la tarea se completa.
 - TypeScript `strict`; los tipos de contenido salen de los esquemas Zod (una sola fuente de verdad).
 - `public/` y `dist/` están fuera de lint/format.
-- `assets/` contiene los modelos fuente (p. ej. `granjero.glb`, el avatar del jugador); la copia que sirve el juego está en `public/models/` y el cargador glTF en `public/vendor/babylon.loaders.js` (ver `assets/README.md`).
+- `assets/` contiene los modelos fuente (p. ej. `granjero.glb`, el avatar del jugador); la copia que sirve el juego está en `public/models/` (ver `assets/README.md`).
 - Para generar modelos 3D con textura (Hunyuan3D local → Blender → juego), usa el skill `generar-asset-3d`, que documenta el proceso completo y sus trampas conocidas.
 Por cada nueva feature crear una rama dedicada y un plan en `docs/plans/` y no mezcles cambios de varias issues en la misma rama.
