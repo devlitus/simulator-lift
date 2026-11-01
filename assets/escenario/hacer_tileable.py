@@ -52,6 +52,24 @@ def guardar(arr: np.ndarray, nombre: str, lado: int, publicar: bool = True) -> N
     img.save(PUBLIC / f"{nombre}.jpg", quality=88)
 
 
+def recortar_fondo_blanco(nombre: str, lado: int) -> None:
+    """Sprite con alfa: el fondo blanco pasa a transparente.
+
+    El color de los píxeles transparentes se rellena con el verde medio de
+    la hoja para que el filtrado de la textura no deje un halo blanco.
+    """
+    img = np.asarray(Image.open(HERE / f"{nombre}_cruda.png").convert("RGB"), dtype=np.float32)
+    blancura = img.min(axis=2)  # cerca de 255 solo en el fondo
+    alfa = np.clip((235 - blancura) / 40, 0, 1)
+    opaco = alfa > 0.5
+    medio = img[opaco].mean(axis=0)
+    rgb = np.where(opaco[..., None], img, medio)
+    rgba = np.dstack([rgb, alfa * 255]).clip(0, 255).astype(np.uint8)
+    sprite = Image.fromarray(rgba, "RGBA").resize((lado, lado), Image.LANCZOS)
+    sprite.save(HERE / f"{nombre}.png", optimize=True)
+    print("ok", HERE / f"{nombre}.png")
+
+
 def ruido_valor(lado: int, celdas: int, rng: np.random.Generator) -> np.ndarray:
     """Ruido de valor periódico (bicúbico) de `celdas`×`celdas` puntos de control."""
     puntos = rng.random((celdas, celdas))
@@ -83,3 +101,6 @@ def variacion(lado: int = 256) -> np.ndarray:
 guardar(tileable(cargar("cesped")), "cesped", 1024)
 guardar(tileable(cargar("roca", recorte=0.2)), "roca", 512, publicar=False)  # va en el GLB
 guardar(variacion(), "variacion_suelo", 256)
+# Arbustos: ambas van embebidas en escenario.glb
+guardar(tileable(cargar("follaje")), "follaje", 512, publicar=False)
+recortar_fondo_blanco("ramillete", 512)

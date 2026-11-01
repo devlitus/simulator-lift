@@ -5,12 +5,13 @@ descarga por la API (/view) como `<nombre>_cruda.png`; después
 `hacer_tileable.py` la convierte en mosaico sin costuras.
 
 Ejecutar con la API local activa:
-python assets/escenario/generar_texturas_comfy.py
+python assets/escenario/generar_texturas_comfy.py [nombre ...]
 """
 
 from __future__ import annotations
 
 import json
+import sys
 import time
 from pathlib import Path
 from urllib.parse import urlencode
@@ -39,6 +40,22 @@ TEXTURAS = {
         "cracks and tiny pale lichen specks, flat even diffuse lighting, low contrast, cozy "
         "farming game painted texture, nothing else in the image, no text.",
     ),
+    "follaje": (
+        2610010014,
+        "Stylized hand-painted close-up of dense bush foliage filling the entire frame edge "
+        "to edge, many small overlapping rounded leaves in rich layered greens, lighter "
+        "yellow-green leaves on top and deep shadowed green gaps between them, painterly "
+        "brush strokes, soft diffuse light, uniform density, cozy farming game texture, no "
+        "sky, no ground, no flowers, no branches visible, no text.",
+    ),
+    "ramillete": (
+        2610010015,
+        "A single small leafy sprig seen from the front, a short twig densely covered with "
+        "about twenty small rounded oval leaves in fresh varied greens, stylized "
+        "hand-painted cozy farming game sprite, crisp clean silhouette, the sprig fills most "
+        "of the frame, isolated on a perfectly flat pure white background, no shadow, no "
+        "ground, no flowers, no text.",
+    ),
 }
 
 
@@ -63,7 +80,10 @@ def post_json(path: str, payload: dict[str, object]) -> dict[str, object]:
         return json.load(response)
 
 
+# Sin argumentos genera todas; con argumentos, solo las nombradas.
 for nombre, (seed, prompt) in TEXTURAS.items():
+    if len(sys.argv) > 1 and nombre not in sys.argv[1:]:
+        continue
     graph = workflow(nombre, seed, prompt)
     (HERE / f"zimage_{nombre}.json").write_text(json.dumps(graph, indent=2) + "\n")
     prompt_id = post_json("/prompt", {"prompt": graph})["prompt_id"]

@@ -20,7 +20,7 @@ sys.path.append(site.getusersitepackages())
 
 import bmesh
 import bpy
-from mathutils import Vector, noise
+from mathutils import Quaternion, Vector, noise
 
 HERE = Path(__file__).resolve().parent
 ASSETS = HERE.parent
@@ -34,7 +34,7 @@ bpy.ops.wm.read_factory_settings(use_empty=True)
 # ---------- utilidades ----------
 
 
-def material(nombre, color, rugosidad=0.9, textura=None):
+def material(nombre, color, rugosidad=0.9, textura=None, recorte=False):
     # Los colores se escriben en sRGB (como en un selector); Blender y glTF
     # trabajan en lineal.
     color = tuple(c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4 for c in color)
@@ -57,6 +57,13 @@ def material(nombre, color, rugosidad=0.9, textura=None):
         links.new(tex.outputs["Color"], mix.inputs["A"])
         mix.inputs["B"].default_value = (*color, 1)
         links.new(mix.outputs["Result"], bsdf.inputs["Base Color"])
+        if recorte:
+            # Alfa recortado (glTF alphaMode MASK, corte 0.5) y doble cara
+            redondeo = ns.new("ShaderNodeMath")
+            redondeo.operation = "ROUND"
+            links.new(tex.outputs["Alpha"], redondeo.inputs[0])
+            links.new(redondeo.outputs["Value"], bsdf.inputs["Alpha"])
+            mat.use_backface_culling = False
     return mat
 
 
@@ -102,10 +109,8 @@ def apoyar(bm):
 
 MAT_ROCA = material("M_Roca", (0.92, 0.9, 0.86), 0.95, "roca.png")
 MAT_MUSGO = material("M_Musgo", (0.42, 0.58, 0.27))
-MAT_HOJA = [
-    material("M_Hoja_A", (0.24, 0.5, 0.2)),
-    material("M_Hoja_B", (0.33, 0.58, 0.22)),
-]
+MAT_FOLLAJE = material("M_Follaje", (0.55, 0.66, 0.5), 0.9, "follaje.png")
+MAT_RAMILLETE = material("M_Ramillete", (1.0, 1.0, 1.0), 0.85, "ramillete.png", recorte=True)
 MAT_HIERBA = material("M_Hierba", (0.36, 0.62, 0.24))
 MAT_TALLO = material("M_Tallo", (0.3, 0.52, 0.2))
 MAT_FLOR = {
@@ -138,16 +143,67 @@ def roca(nombre, tam, aplastar, semilla):
 
 
 def arbusto(nombre, bolas, semilla):
+    """Cuerpo suave con textura de follaje y tarjetas de ramillete encima.
+
+    Las tarjetas (quads con el sprite recortado) rompen el contorno para que
+    no se vean los polígonos. Sus normales apuntan hacia fuera desde el
+    centro de su bola: el arbusto se ilumina como una masa redonda en vez
+    de como planos sueltos.
+    """
     rng = random.Random(semilla)
-    piezas = []
+    cuerpo = bmesh.new()
+    tarjetas = bmesh.new()
+    normales = []  # una por vértice de tarjeta, en orden de creación
     for i, (x, y, z, r) in enumerate(bolas):
+        centro = Vector((x, y, z))
         bm = bmesh.new()
-        bmesh.ops.create_icosphere(bm, subdivisions=2, radius=r)
-        deformar(bm, r * 0.18, 2.0, semilla + i)
-        bmesh.ops.translate(bm, verts=bm.verts, vec=Vector((x, y, z)))
-        bm.normal_update()
-        piezas.append(objeto(f"{nombre}_{i}", bm, MAT_HOJA[rng.randrange(2)]))
-    return unir(nombre, piezas)
+        bmesh.ops.create_icosphere(bm, subdivisions=3, radius=r * 0.88)
+        deformar(bm, r * 0.12, 2.0, semilla + i)
+        bmesh.ops.translate(bm, verts=bm.verts, vec=centro)
+        me = bpy.data.meshes.new("tmp")
+        bm.to_mesh(me)
+        bm.free()
+        cuerpo.from_mesh(me)
+        bpy.data.meshes.remove(me)
+
+        for _ in range(int(240 * r * r) + 26):
+            # Dirección al azar, sin tarjetas mirando al suelo
+            d = Vector((rng.gauss(0, 1), rng.gauss(0, 1), abs(rng.gauss(0, 1)) * 0.8 - 0.35))
+            d.normalize()
+            p = centro + d * r * rng.uniform(0.78, 0.98)
+            if p.z < 0.08:
+                continue
+            # Plano de la tarjeta: inclinado entre tangente y radial
+            t = d.cross(Vector((0, 0, 1)))
+            if t.length < 1e-3:
+                t = Vector((1, 0, 0))
+            t.normalize()
+            t.rotate(Quaternion(d, rng.uniform(0, math.tau)))
+            b = d.cross(t).normalized()
+            inclinacion = rng.uniform(0.35, 1.0)
+            arriba = (b * math.cos(inclinacion) + d * math.sin(inclinacion)).normalized()
+            lado = r * rng.uniform(0.6, 0.85)
+            base = p - arriba * lado * 0.35
+            esquinas = [
+                base - t * lado / 2,
+                base + t * lado / 2,
+                base + t * lado / 2 + arriba * lado,
+                base - t * lado / 2 + arriba * lado,
+            ]
+            vs = [tarjetas.verts.new(c) for c in esquinas]
+            f = tarjetas.faces.new(vs)
+            uv = tarjetas.loops.layers.uv.verify()
+            for loop, coord in zip(f.loops, [(0, 0), (1, 0), (1, 1), (0, 1)]):
+                loop[uv].uv = coord
+            normales.extend((c - centro + Vector((0, 0, r * 0.3))).normalized() for c in esquinas)
+
+    cuerpo.normal_update()
+    uv_caja(cuerpo, 1.4)
+    obj_cuerpo = objeto(f"{nombre}_cuerpo", cuerpo, MAT_FOLLAJE, plano=False)
+    obj_tarjetas = objeto(f"{nombre}_hojas", tarjetas, MAT_RAMILLETE, plano=False)
+    me = obj_tarjetas.data
+    me.normals_split_custom_set([normales[l.vertex_index] for l in me.loops])
+    return unir(nombre, [obj_cuerpo, obj_tarjetas])
 
 
 def unir(nombre, piezas):

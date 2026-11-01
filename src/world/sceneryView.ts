@@ -7,6 +7,7 @@ import { CONFIG } from '../core/constants';
 import type { PenConfig } from '../../data/schemas';
 import { Ray } from '@babylonjs/core/Culling/ray';
 import { SceneLoader } from '@babylonjs/core/Loading/sceneLoader';
+import { PBRMaterial } from '@babylonjs/core/Materials/PBR/pbrMaterial';
 import { StandardMaterial } from '@babylonjs/core/Materials/standardMaterial';
 import { Texture } from '@babylonjs/core/Materials/Textures/texture';
 import { Color3 } from '@babylonjs/core/Maths/math.color';
@@ -14,7 +15,7 @@ import { Matrix, Quaternion, Vector3 } from '@babylonjs/core/Maths/math.vector';
 import { Mesh } from '@babylonjs/core/Meshes/mesh';
 import { MeshBuilder } from '@babylonjs/core/Meshes/meshBuilder';
 import { PhysicsImpostor } from '@babylonjs/core/Physics/v1/physicsImpostor';
-import type { AbstractMesh, Scene } from '@babylonjs/core';
+import type { AbstractMesh, Material, Scene } from '@babylonjs/core';
 import type { WorldView } from './worldView';
 
 interface Rect {
@@ -261,11 +262,33 @@ export class SceneryView {
         meshes,
         this.bushes.filter((p) => p.variant === v),
       );
-      for (const m of meshes) this.world.addShadow(m);
+      for (const m of meshes) {
+        m.material = this.matte(m.material);
+        this.world.addShadow(m);
+      }
     }
     const pines = this.pines(hills);
     this.instance(parts('Pino_01'), pines[0]);
     this.instance(parts('Pino_02'), pines[1]);
+  }
+
+  // Copia mate (StandardMaterial sin brillo, como el resto de la escena) de
+  // un material PBR del glTF: sin mapa de entorno el PBR sale blanquecino.
+  // Las hojas traen normales hacia fuera del arbusto, así que no se usa la
+  // luz de doble cara (las caras traseras se verían oscuras).
+  private matte(source: Material | null): Material | null {
+    if (!(source instanceof PBRMaterial)) return source;
+    const mat = new StandardMaterial(`${source.name}_mate`, this.scene);
+    mat.diffuseTexture = source.albedoTexture;
+    mat.diffuseColor = source.albedoColor;
+    mat.specularColor = Color3.Black();
+    mat.backFaceCulling = source.backFaceCulling;
+    mat.twoSidedLighting = false;
+    if (source.transparencyMode === PBRMaterial.MATERIAL_ALPHATEST && mat.diffuseTexture) {
+      mat.diffuseTexture.hasAlpha = true; // recorte alfa, sin mezcla
+      mat.alphaCutOff = source.alphaCutOff;
+    }
+    return mat;
   }
 
   // Thin instances de cada malla del prop. La matriz de cada copia es
