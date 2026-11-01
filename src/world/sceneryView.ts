@@ -26,6 +26,12 @@ import {
   type Rect,
 } from './farmLayout';
 import { MARKET_ZONE } from './marketLayout';
+import {
+  houseFootprint,
+  NEIGHBORHOOD_HOUSES,
+  NEIGHBORHOOD_LANES,
+  NEIGHBORHOOD_ZONE,
+} from './neighborhoodLayout';
 import { STORAGE } from './warehouse';
 import type { WorldView } from './worldView';
 
@@ -48,9 +54,13 @@ const around = (x1: number, x2: number, z1: number, z2: number, margin: number):
 
 const CLEAR_ZONES: Rect[] = [
   { minX: -1.7, maxX: 1.7, minZ: -28.6, maxZ: 13.5 }, // camino norte-sur + spawn
-  { minX: -16.6, maxX: 14.6, minZ: -5.7, maxZ: -2.3 }, // camino este-oeste
-  { minX: -18.5, maxX: -9.5, minZ: -14.5, maxZ: -5.5 }, // casa de Gon
-  { minX: -14.5, maxX: -7.5, minZ: -8.5, maxZ: -2.5 }, // ruta de Gon
+  { minX: NEIGHBORHOOD_ZONE.minX - 0.6, maxX: 14.6, minZ: -5.7, maxZ: -2.3 }, // camino este-oeste
+  ...NEIGHBORHOOD_LANES.map((c) => around(c.minX, c.maxX, c.minZ, c.maxZ, 0.6)), // calles del barrio
+  // Casas del barrio con su jardín delantero (incluida la de Gon)
+  ...NEIGHBORHOOD_HOUSES.map((h) => {
+    const f = houseFootprint(h);
+    return around(f.minX, f.maxX, f.minZ, h.lot.frontZ, 0.4);
+  }),
   MARKET_ZONE, // tienda de Marta y puestos del mercado
   { minX: -2, maxX: 1.7, minZ: FARM_ENTRANCE.z1 - 1, maxZ: FARM_ENTRANCE.z2 + 1 }, // ante la entrada
   around(ENTRANCE_PATH.minX, ENTRANCE_PATH.maxX, ENTRANCE_PATH.minZ, ENTRANCE_PATH.maxZ, 0.4),

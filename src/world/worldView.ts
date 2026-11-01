@@ -20,7 +20,7 @@ import { MeshBuilder } from '@babylonjs/core/Meshes/meshBuilder';
 import { TransformNode } from '@babylonjs/core/Meshes/transformNode';
 import { PhysicsImpostor } from '@babylonjs/core/Physics/v1/physicsImpostor';
 import { Scene } from '@babylonjs/core/scene';
-import type { ISceneLoaderAsyncResult, Node } from '@babylonjs/core';
+import type { AssetContainer, ISceneLoaderAsyncResult, Node } from '@babylonjs/core';
 import { FARMER_HOUSE, PORCH_BARRIERS } from './farmerPorch';
 import {
   ENTRANCE_PATH,
@@ -34,11 +34,13 @@ import {
 } from './farmLayout';
 import { STORAGE, STORAGE_WALLS } from './warehouse';
 import { SHOP_BUILDING, SHOPS, shopColliders, type ShopDef } from './marketLayout';
+import { NEIGHBORHOOD_HOUSES, NEIGHBORHOOD_LANES, NEIGHBORHOOD_ZONE } from './neighborhoodLayout';
 import { TREE_SPOTS } from './treeSpots';
 import { WellView } from './wellView';
 
-// El camino este-oeste llega hasta la última tienda del mercado
+// El camino este-oeste va del final del barrio a la última tienda del mercado
 const EAST_WEST_END_X = Math.max(...SHOPS.map((s) => s.x)) + 3;
+const EAST_WEST_START_X = NEIGHBORHOOD_ZONE.minX;
 
 interface PathTile {
   x: number;
@@ -184,13 +186,13 @@ export class WorldView {
     p1.position.set(0, 0.02, (STREET_END_Z - 28) / 2);
     p1.material = sand;
     p1.receiveShadows = true;
-    // Camino este-oeste: de la casa de Gon a la tienda de Marta
+    // Camino este-oeste: del final del barrio de los vecinos a la tienda de Marta
     const p2 = MeshBuilder.CreateBox(
       'path2',
-      { width: EAST_WEST_END_X + 16, height: 0.04, depth: 2.2 },
+      { width: EAST_WEST_END_X - EAST_WEST_START_X, height: 0.04, depth: 2.2 },
       this.scene,
     );
-    p2.position.set((EAST_WEST_END_X - 16) / 2, 0.02, -4);
+    p2.position.set((EAST_WEST_END_X + EAST_WEST_START_X) / 2, 0.02, -4);
     p2.material = sand;
     p2.receiveShadows = true;
     const { minX, maxX, minZ, maxZ } = ENTRANCE_PATH;
@@ -202,6 +204,17 @@ export class WorldView {
     p3.position.set((minX + maxX) / 2, 0.02, (minZ + maxZ) / 2);
     p3.material = sand;
     p3.receiveShadows = true;
+    // Calles del barrio, entre sus filas de casas
+    for (const lane of NEIGHBORHOOD_LANES) {
+      const p = MeshBuilder.CreateBox(
+        'pathLane',
+        { width: lane.maxX - lane.minX, height: 0.04, depth: lane.maxZ - lane.minZ },
+        this.scene,
+      );
+      p.position.set((lane.minX + lane.maxX) / 2, 0.02, (lane.minZ + lane.maxZ) / 2);
+      p.material = sand;
+      p.receiveShadows = true;
+    }
 
     // Una rejilla compartida une ambas franjas sin solapar piedras en el
     // cruce. Las piezas de los extremos se recortan a los límites del camino.
@@ -210,8 +223,9 @@ export class WorldView {
     const tiles = new Map<string, PathTile>();
     const paths = [
       { minX: -1.1, maxX: 1.1, minZ: -28, maxZ: STREET_END_Z },
-      { minX: -16, maxX: EAST_WEST_END_X, minZ: -5.1, maxZ: -2.9 },
+      { minX: EAST_WEST_START_X, maxX: EAST_WEST_END_X, minZ: -5.1, maxZ: -2.9 },
       ENTRANCE_PATH,
+      ...NEIGHBORHOOD_LANES,
     ];
     for (const path of paths) {
       const minCol = Math.floor(path.minX / step);
@@ -323,9 +337,9 @@ export class WorldView {
 
   // Forja de Gon: la colisión permanece aunque el GLB aún no haya cargado.
   // La casa gris original sirve de respaldo si falla la importación.
+  // Casa de Gon: su parcela fija del barrio de los vecinos (neighborhoodLayout)
   buildGonHouse(): void {
-    const x = -14;
-    const z = -10;
+    const { x, z } = NEIGHBORHOOD_HOUSES.find((h) => h.model === null)!;
     const hit = MeshBuilder.CreateBox(
       'gonHouseHit',
       { width: 4.4, height: 4.8, depth: 4.4 },
@@ -408,9 +422,102 @@ export class WorldView {
   buildBuildings(): void {
     for (const shop of SHOPS) this.buildShop(shop); // el mercado
     this.buildGonHouse();
+    this.buildNeighborhood();
     this.buildFarmerHouse(); // Casa del granjero, al sur del almacén
     this.buildStorage(); // Almacén del granjero, al sur de la parcela
     this.buildSalesStand(); // Puesto de ventas, en la esquina suroeste de la granja
+  }
+
+  // Barrio de los vecinos (assets/casas_vecinos/, reparto en neighborhoodLayout):
+  // cada modelo se carga una vez y se clona en sus parcelas, con la colisión
+  // fija del cuerpo de la casa y una casa de primitivas de respaldo.
+  buildNeighborhood(): void {
+    const cargas = new Map<string, Promise<AssetContainer>>();
+    for (const house of NEIGHBORHOOD_HOUSES) {
+      const model = house.model;
+      if (!model) continue; // la de Gon la levanta buildGonHouse
+      const { cx, cz, w, d } = house.collider;
+      const hit = MeshBuilder.CreateBox(
+        'neighborHouseHit',
+        { width: w, height: 3, depth: d },
+        this.scene,
+      );
+      hit.position.set(cx, 1.5, cz);
+      hit.isVisible = false;
+      hit.physicsImpostor = new PhysicsImpostor(
+        hit,
+        PhysicsImpostor.BoxImpostor,
+        { mass: 0 },
+        this.scene,
+      );
+
+      const root = new TransformNode('neighborHouseRoot', this.scene);
+      root.position.set(house.x, 0, house.z);
+      if (house.mirrored) root.scaling.x = -1;
+      const base = MeshBuilder.CreateBox(
+        'neighborHouseBase',
+        { width: w, height: 2.6, depth: d },
+        this.scene,
+      );
+      base.parent = root;
+      base.position.y = 1.3;
+      base.material = this.mat(0.9, 0.85, 0.72);
+      const roof = MeshBuilder.CreateCylinder(
+        'neighborHouseRoof',
+        { diameterTop: 0, diameterBottom: w * 1.45, height: 1.6, tessellation: 4 },
+        this.scene,
+      );
+      roof.parent = root;
+      roof.position.y = 3.4;
+      roof.rotation.y = Math.PI / 4;
+      roof.material = this.mat(0.68, 0.29, 0.2);
+      for (const p of [base, roof]) this.addShadow(p);
+
+      let carga = cargas.get(model.file);
+      if (!carga) {
+        carga = SceneLoader.LoadAssetContainerAsync('/models/', model.file, this.scene).then(
+          (container) => {
+            for (const m of container.materials) {
+              this.scene.addMaterial(m);
+              if (m instanceof PBRMaterial && (m.name === 'M_Cristal' || m.name === 'M_Farol')) {
+                this.nightGlow.push({ mat: m, r: 1, g: 0.72, b: 0.35 });
+              }
+            }
+            return container;
+          },
+        );
+        cargas.set(model.file, carga);
+      }
+      void this._placeNeighborHouse(root, carga, [base, roof]);
+    }
+  }
+
+  private async _placeNeighborHouse(
+    root: TransformNode,
+    carga: Promise<AssetContainer>,
+    prims: Mesh[],
+  ): Promise<void> {
+    try {
+      const container = await carga;
+      // En metros, sin reescalar; clones (no instancias) para que den sombra
+      const copia = container.instantiateModelsToScene((n) => n, false, {
+        doNotInstantiate: true,
+      });
+      for (const node of copia.rootNodes) {
+        node.parent = root;
+        for (const m of node.getChildMeshes(false)) {
+          if (m.getTotalVertices() === 0) continue;
+          m.receiveShadows = true;
+          this.addShadow(m);
+        }
+      }
+      for (const p of prims) {
+        this.shadow?.removeShadowCaster(p);
+        p.dispose();
+      }
+    } catch {
+      // fallback: se queda la casa de primitivas
+    }
   }
 
   // Tienda del mercado (assets/tiendas/): colisiones fijas, primitivas de

@@ -222,6 +222,15 @@ Contenido binario del juego: modelos `.glb`, texturas y audio.
   tienda. Misma planta y colisiones para las tres. Fuente
   `assets/tienda_interior.blend`; script y previews en
   [`assets/tienda_interior/`](tienda_interior/README.md).
+- `casa_vecino_cabana.glb`, `casa_vecino_encalada.glb`,
+  `casa_vecino_entramado.glb`, `casa_vecino_piedra.glb` y
+  `casa_vecino_porche.glb` — las cinco casas del barrio de los vecinos:
+  cabaña de troncos con porche, casa encalada, casa alta de entramado,
+  casita de piedra con tejado de paja y casa de tablas azules con porche.
+  Modelado procedural propio en Blender (sin IA), en metros, con colores
+  planos en `COLOR_0` y las piezas de las tiendas. Fuente
+  `assets/casas_vecinos.blend`; script, métricas y preview en
+  [`assets/casas_vecinos/`](casas_vecinos/README.md).
 - `puesto_ventas.glb` — modelo 3D del puesto de ventas del granjero generado
   con Hunyuan3D-2 (servidor local, imagen→3D con textura 2048×2048) a partir
   de `assets/puesto_ventas_referencia.png` (imagen generada con ComfyUI en
