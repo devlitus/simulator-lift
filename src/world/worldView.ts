@@ -679,23 +679,23 @@ export class WorldView {
 
   // Puesto de ventas: modelo GLB (assets/puesto_ventas.glb, publicado en
   // /models/) con fallback a primitivas si falla la carga. Va en la esquina
-  // suroeste de la granja, con el mostrador mirando al este (+x), hacia el
-  // interior. El GLB mide ~1.96×1.94×1.21 (la vista lo escala a ~1.9 de
-  // alto): es ancho y poco profundo, con el mostrador en su cara frontal.
-  // La rotación π/2 en Y lleva la fachada local +z hacia el este; sellBin
-  // queda delante del mostrador.
+  // suroeste de la granja, con el mostrador mirando al norte (-z), hacia el
+  // camino de la entrada. El GLB mide ~1.96×1.94×1.21 (la vista lo escala a
+  // ~1.9 de alto): es ancho y poco profundo, con el mostrador en su cara
+  // frontal. La rotación π en Y lleva la fachada local +z hacia el norte;
+  // sellBin queda delante del mostrador.
   buildSalesStand(): void {
     const { x, z } = SALES_STAND;
 
     // Colisión fija (independiente del modelo): caja invisible que cubre el
-    // volumen del puesto (~1.2×1.9×1.9 tras el giro). El mostrador queda en
-    // la cara este y el cuerpo se extiende hacia el oeste.
+    // volumen del puesto (~1.9×1.9×1.2 tras el giro), con el mostrador en
+    // la cara norte.
     const hit = MeshBuilder.CreateBox(
       'salesStandHit',
-      { width: 1.4, height: 2.0, depth: 2.0 },
+      { width: 2.0, height: 2.0, depth: 1.4 },
       this.scene,
     );
-    hit.position.set(x + 0.6, 1.0, z);
+    hit.position.set(x, 1.0, z - 0.6);
     hit.isVisible = false;
     hit.physicsImpostor = new PhysicsImpostor(
       hit,
@@ -704,10 +704,10 @@ export class WorldView {
       this.scene,
     );
 
-    // El frente local +z del GLB rota al este, hacia el interior de la granja.
+    // El frente local +z del GLB rota al norte, hacia el camino de la entrada.
     const root = new TransformNode('salesStandRoot', this.scene);
     root.position.set(x, 0, z);
-    root.rotation.y = Math.PI / 2;
+    root.rotation.y = Math.PI;
 
     // Primitivas de respaldo, con el estilo del resto del pueblo. El
     // mostrador local +z hereda el giro del root.
@@ -1202,7 +1202,7 @@ export class WorldView {
     box(0.3, 0.3, z2 - z1 + 0.9, x, 3.2, z);
     box(0.06, 1.2, 0.06, x, 3.8, z); // soporte del letrero
 
-    // Letrero, sobre la cumbrera: de cara a la cámara, que mira hacia -z
+    // Letrero, sobre la cumbrera: de cara a la calle (-x), como el exterior del arco
     const tex = new DynamicTexture(
       'granjaLetreroTex',
       { width: 512, height: 184 },
@@ -1226,8 +1226,8 @@ export class WorldView {
       { width: 1.34, height: 0.48 },
       this.scene,
     );
-    sign.position.set(x, signY, z + 0.055);
-    sign.rotation.y = Math.PI;
+    sign.position.set(x - 0.055, signY, z);
+    sign.rotation.y = Math.PI / 2; // la cara del plano (-z local) pasa a mirar a -x
     sign.material = signMat;
 
     void this._loadFarmEntrance(root, prims);

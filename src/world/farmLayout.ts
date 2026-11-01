@@ -58,11 +58,11 @@ export const FARM_FENCE: [number, number, number, number][] = [
 
 export const WELL = { x: 13, z: 13.5 };
 
-/** Centro del puesto de ventas, en la esquina suroeste, con el mostrador hacia el este. */
+/** Centro del puesto de ventas, en la esquina suroeste, con el mostrador al norte (hacia el camino). */
 export const SALES_STAND = { x: 5, z: 23.2 };
 
 /** Punto de venta: delante del mostrador. */
-export const SALES_POINT = { x: SALES_STAND.x + 1.9, z: SALES_STAND.z };
+export const SALES_POINT = { x: SALES_STAND.x, z: SALES_STAND.z - 1.9 };
 
 export function rectsOverlap(a: Rect, b: Rect): boolean {
   return a.minX < b.maxX && b.minX < a.maxX && a.minZ < b.maxZ && b.minZ < a.maxZ;
