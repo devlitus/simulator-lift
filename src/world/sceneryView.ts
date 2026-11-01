@@ -1,6 +1,6 @@
 // SceneryView (vista Babylon): decoración del entorno sin reglas de juego.
 // Repite los props de escenario.glb (matas de hierba, flores silvestres,
-// rocas, arbustos, valla perimetral y pinos) con thin instances: una llamada
+// rocas, arbustos y pinos) con thin instances: una llamada
 // de dibujo por malla aunque haya cientos de copias. Las colinas del
 // horizonte rodean el mapa para que no termine en el vacío.
 import { CONFIG } from '../core/constants';
@@ -9,7 +9,6 @@ import { Ray } from '@babylonjs/core/Culling/ray';
 import { SceneLoader } from '@babylonjs/core/Loading/sceneLoader';
 import { PBRMaterial } from '@babylonjs/core/Materials/PBR/pbrMaterial';
 import { StandardMaterial } from '@babylonjs/core/Materials/standardMaterial';
-import { Texture } from '@babylonjs/core/Materials/Textures/texture';
 import { Color3 } from '@babylonjs/core/Maths/math.color';
 import { Matrix, Quaternion, Vector3 } from '@babylonjs/core/Maths/math.vector';
 import { Mesh } from '@babylonjs/core/Meshes/mesh';
@@ -143,16 +142,31 @@ export class SceneryView {
     );
   }
 
-  // Hierba y flores: matas sueltas por todo el prado y flores en corros.
-  private grassAndFlowers(): { tufts: Placement[][]; flowers: Placement[][] } {
+  // Altura de las colinas en (x, z); 0 dentro del mapa o sin colinas.
+  private heightAt(hills: AbstractMesh | undefined, x: number, z: number): number | null {
+    const half = CONFIG.groundSize / 2;
+    if (!hills || (Math.abs(x) < half && Math.abs(z) < half)) return 0;
+    const hit = new Ray(new Vector3(x, 100, z), new Vector3(0, -1, 0), 200).intersectsMesh(hills);
+    return hit.hit && hit.pickedPoint ? hit.pickedPoint.y : null;
+  }
+
+  // Hierba y flores: matas sueltas por todo el prado y flores en corros. Se
+  // siembran también un poco más allá del borde para que no se note.
+  private grassAndFlowers(hills: AbstractMesh | undefined): {
+    tufts: Placement[][];
+    flowers: Placement[][];
+  } {
     const r = rng(33);
-    const half = CONFIG.groundSize / 2 - 0.6;
+    const half = CONFIG.groundSize / 2 + 6;
     const tufts: Placement[][] = [[], []];
-    for (let i = 0; i < 900; i++) {
+    for (let i = 0; i < 1100; i++) {
       const x = (r() * 2 - 1) * half;
       const z = (r() * 2 - 1) * half;
-      if (!this.isFree(x, z, 0.1)) continue;
-      tufts[i % 2].push({ x, z, rotY: r() * Math.PI * 2, scale: 0.7 + r() * 0.7 });
+      const rotY = r() * Math.PI * 2;
+      const scale = 0.7 + r() * 0.7;
+      const y = this.heightAt(hills, x, z);
+      if (y === null || !this.isFree(x, z, 0.1)) continue;
+      tufts[i % 2].push({ x, y, z, rotY, scale });
     }
     const flowers: Placement[][] = [[], [], []];
     for (let c = 0; c < 34; c++) {
@@ -163,51 +177,28 @@ export class SceneryView {
       for (let i = 0; i < n; i++) {
         const x = cx + (r() * 2 - 1) * 1.4;
         const z = cz + (r() * 2 - 1) * 1.4;
-        if (Math.abs(x) > half || Math.abs(z) > half || !this.isFree(x, z, 0.2)) continue;
-        flowers[kind].push({ x, z, rotY: r() * Math.PI * 2, scale: 1.1 + r() * 0.6 });
+        const rotY = r() * Math.PI * 2;
+        const scale = 1.1 + r() * 0.6;
+        const y = this.heightAt(hills, x, z);
+        if (y === null || !this.isFree(x, z, 0.2)) continue;
+        flowers[kind].push({ x, y, z, rotY, scale });
       }
     }
     return { tufts, flowers };
-  }
-
-  // Valla de madera a lo largo de los muros invisibles del borde del mapa.
-  private fence(): Placement[] {
-    const half = CONFIG.groundSize / 2;
-    const out: Placement[] = [];
-    const segments = Math.round(CONFIG.groundSize / 2);
-    // Cada tramo empieza en su poste y avanza 2 m girando por los 4 lados.
-    const sides = [
-      { x: -half, z: -half, dx: 1, dz: 0, rotY: 0 },
-      { x: half, z: -half, dx: 0, dz: 1, rotY: -Math.PI / 2 },
-      { x: half, z: half, dx: -1, dz: 0, rotY: Math.PI },
-      { x: -half, z: half, dx: 0, dz: -1, rotY: Math.PI / 2 },
-    ];
-    for (const s of sides) {
-      for (let i = 0; i < segments; i++) {
-        out.push({ x: s.x + s.dx * i * 2, z: s.z + s.dz * i * 2, rotY: s.rotY, scale: 1 });
-      }
-    }
-    return out;
   }
 
   // Pinos sobre las colinas, más densos cerca del mapa.
   private pines(hills: AbstractMesh | undefined): Placement[][] {
     const r = rng(34);
     const out: Placement[][] = [[], []];
-    const ray = new Ray(Vector3.Zero(), new Vector3(0, -1, 0), 200);
     for (let i = 0; i < 520; i++) {
       const x = (r() * 2 - 1) * 95;
       const z = (r() * 2 - 1) * 95;
       const d = Math.max(Math.abs(x), Math.abs(z));
       if (d < CONFIG.groundSize / 2 + 2.5) continue;
       if (r() > 1.15 - (d - 34) / 70) continue; // se aclaran al alejarse
-      let y = 0;
-      if (hills) {
-        ray.origin.set(x, 100, z);
-        const hit = ray.intersectsMesh(hills);
-        if (!hit.hit || !hit.pickedPoint) continue;
-        y = hit.pickedPoint.y;
-      }
+      const y = this.heightAt(hills, x, z);
+      if (y === null) continue;
       out[i % 2].push({ x, y: y - 0.1, z, rotY: r() * Math.PI * 2, scale: 0.8 + r() * 0.7 });
     }
     return out;
@@ -226,28 +217,25 @@ export class SceneryView {
           m instanceof Mesh && m.name.startsWith(prefix) && m.getTotalVertices() > 0,
       );
 
-    // Colinas: misma textura de césped (UV a 4 m) con el color por vértice.
+    // Las colinas pasan a ser el suelo visible de todo el mundo, con el
+    // material del terreno (sus UV cubren el mapa igual que las de su cara
+    // superior): así no hay costura en el borde. El terreno sigue como
+    // superficie física invisible y vuelve a verse si el GLB falla.
     const hills = parts('Colinas')[0];
     if (hills) {
-      const mat = new StandardMaterial('hillsMat', this.scene);
-      const tex = new Texture('/textures/cesped.jpg', this.scene);
-      tex.uScale = tex.vScale = 0.8;
-      mat.diffuseTexture = tex;
-      mat.diffuseColor = new Color3(0.78, 0.86, 0.74);
-      mat.specularColor = Color3.Black();
-      hills.material = mat;
+      hills.material = this.world.ground.material;
       hills.isPickable = false;
       hills.receiveShadows = true;
       hills.computeWorldMatrix(true);
+      this.world.ground.isVisible = false;
     }
 
-    const { tufts, flowers } = this.grassAndFlowers();
+    const { tufts, flowers } = this.grassAndFlowers(hills);
     this.instance(parts('Hierba_01'), tufts[0]);
     this.instance(parts('Hierba_02'), tufts[1]);
     this.instance(parts('Flores_Blanca'), flowers[0]);
     this.instance(parts('Flores_Amarilla'), flowers[1]);
     this.instance(parts('Flores_Malva'), flowers[2]);
-    this.instance(parts('Valla_Tramo'), this.fence());
     for (let v = 0; v < 3; v++) {
       const meshes = parts(`Roca_0${v + 1}`);
       this.instance(

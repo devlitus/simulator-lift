@@ -119,7 +119,6 @@ MAT_FLOR = {
     "Malva": material("M_Flor_Malva", (0.72, 0.5, 0.88)),
 }
 MAT_CORAZON = material("M_Flor_Corazon", (0.95, 0.7, 0.15))
-MAT_MADERA = material("M_Madera", (0.5, 0.36, 0.22))
 MAT_TRONCO = material("M_Tronco_Pino", (0.36, 0.24, 0.15))
 MAT_PINO = material("M_Pino", (0.16, 0.36, 0.2))
 
@@ -296,42 +295,13 @@ def pino(nombre, alto, semilla):
     return unir(nombre, piezas)
 
 
-def tramo_valla(nombre, largo=2.0):
-    """Un poste en x=0 y dos travesaños hacia +x: los tramos se encadenan."""
-    bm = bmesh.new()
-    bmesh.ops.create_cube(bm, size=1.0, matrix=_escala(Vector((0, 0, 0.5))), calc_uvs=False)
-    for v in bm.verts:
-        v.co.x *= 0.16
-        v.co.y *= 0.16
-        v.co.z *= 1.0
-    for z in (0.4, 0.75):
-        tmp = bmesh.new()
-        bmesh.ops.create_cube(tmp, size=1.0)
-        for v in tmp.verts:
-            v.co.x = v.co.x * largo + largo / 2
-            v.co.y *= 0.08
-            v.co.z = v.co.z * 0.1 + z
-        me = bpy.data.meshes.new("tmp")
-        tmp.to_mesh(me)
-        tmp.free()
-        bm.from_mesh(me)
-        bpy.data.meshes.remove(me)
-    bm.normal_update()
-    return objeto(nombre, bm, MAT_MADERA)
+def colinas(nombre, lado=260.0, n=104, borde=34.0, mapa=64.0):
+    """Suelo visible del mundo: llano dentro del mapa y colinas suaves fuera.
 
-
-def _escala(t):
-    from mathutils import Matrix
-
-    return Matrix.Translation(t)
-
-
-def colinas(nombre, lado=260.0, n=104, borde=34.0):
-    """Terreno del horizonte: llano dentro del mapa y colinas suaves fuera.
-
-    La distancia es cuadrada (max(|x|,|y|)) porque el mapa es cuadrado. Lleva
-    UV en metros/4 para repetir la textura del césped y color por vértice
-    para oscurecer las laderas lejanas.
+    La distancia es cuadrada (max(|x|,|y|)) porque el mapa es cuadrado. Las
+    UV valen 0..1 sobre el mapa de `mapa` metros, como la cara superior del
+    terreno del juego, para compartir su material sin costura en el borde.
+    El color por vértice es blanco en el llano y oscurece las laderas.
     """
     bm = bmesh.new()
     bmesh.ops.create_grid(bm, x_segments=n, y_segments=n, size=lado / 2)
@@ -343,14 +313,17 @@ def colinas(nombre, lado=260.0, n=104, borde=34.0):
         t = t * t * (3 - 2 * t)
         ondas = noise.noise(Vector((v.co.x * 0.035, v.co.y * 0.035, 0.5))) * 0.5 + 0.5
         detalle = noise.noise(Vector((v.co.x * 0.11, v.co.y * 0.11, 2.5))) * 0.5 + 0.5
-        v.co.z = t * (4.0 + ondas * 16.0 + detalle * 3.0) - 0.06
+        v.co.z = t * (4.0 + ondas * 16.0 + detalle * 3.0)
     for f in bm.faces:
         for loop in f.loops:
             co = loop.vert.co
-            loop[uv].uv = (co.x / 4.0, co.y / 4.0)
+            loop[uv].uv = ((co.x + mapa / 2) / mapa, (co.y + mapa / 2) / mapa)
+            d = max(abs(co.x), abs(co.y))
+            t = max(0.0, min(1.0, (d - borde) / 12.0))
             altura = max(0.0, min(1.0, co.z / 22.0))
             sombra = 0.92 - altura * 0.18 + noise.noise(co * 0.07) * 0.06
-            loop[col] = (sombra * 0.95, sombra, sombra * 0.9, 1.0)
+            mezcla = lambda k: 1.0 + (sombra * k - 1.0) * t  # noqa: E731
+            loop[col] = (mezcla(0.95), mezcla(1.0), mezcla(0.9), 1.0)
     bm.normal_update()
     obj = objeto(nombre, bm, material("M_Colinas", (1, 1, 1)), plano=False)
     return obj
@@ -372,11 +345,10 @@ def main():
     matas = [mata_hierba("Hierba_01", 9, 0.38, 21), mata_hierba("Hierba_02", 7, 0.28, 22)]
     flor = [flores(f"Flores_{c}", c, 30 + i) for i, c in enumerate(MAT_FLOR)]
     pinos = [pino("Pino_01", 6.0, 41), pino("Pino_02", 4.5, 42)]
-    valla = tramo_valla("Valla_Tramo")
     horizonte = colinas("Colinas")
 
     # Separación visual en el .blend fuente (el juego no usa estas posiciones)
-    todos = rocas + arbustos + matas + flor + pinos + [valla]
+    todos = rocas + arbustos + matas + flor + pinos
     for i, o in enumerate(todos):
         o.location = (i * 2.5 - 15, -40, 0)
     horizonte.location = (0, 0, 0)
