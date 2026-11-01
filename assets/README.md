@@ -45,12 +45,13 @@ Contenido binario del juego: modelos `.glb`, texturas y audio.
   isométrica creada con Z-Image-Turbo). La malla se limpió soldando 6.179
   vértices duplicados y es un único componente de 40.000 caras; tiene
   profundidad real, la puerta queda hacia `+z` y la base está a `z=0` en
-  Blender. El juego la sirve como `public/models/casa_lila.glb`, la escala
-  por su caja envolvente y mantiene una casa de primitivas como respaldo.
-  Fuentes editables: `assets/casa_lila.blend`,
+  Blender. Fuentes editables: `assets/casa_lila.blend`,
   `assets/casa_lila_referencia.png` y
   `assets/casa_lila_referencia_frontal.png` (primer concepto descartado por
-  no aportar profundidad suficiente).
+  no aportar profundidad suficiente). **Ya no se usa**: la casa y el jardín
+  de flores de Lila (`models/flor_margarita.glb`, ver
+  [`assets/flores_lila/`](flores_lila/README.md)) se quitaron del pueblo;
+  Lila atiende la floristería del mercado.
 - `models/casa_gon.glb` — casa y forja de Gon, generada con Hunyuan3D-2mini
   y textura de 2048×2048 a partir de `assets/casa_gon_referencia.png`
   (Z-Image-Turbo local). Piedra gris, entramado de madera, tejado de
