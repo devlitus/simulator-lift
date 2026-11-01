@@ -5,7 +5,7 @@
 // Cabaña de 5×4 m con la puerta al oeste (-x), hacia la entrada de la granja, y porche
 // delante. `width` va de lado a lado de la fachada (a lo largo de z) y `depth`, de la
 // puerta a la pared trasera (a lo largo de x).
-export const FARMER_HOUSE = { x: 23, z: 15, width: 5.2, depth: 4.2, height: 4.8 };
+export const FARMER_HOUSE = { x: 25.5, z: 21.5, width: 5.2, depth: 4.2, height: 4.8 };
 
 const { x: X0, z: Z0 } = FARMER_HOUSE;
 const WALL_X = X0 - FARMER_HOUSE.depth / 2; // muro de la puerta

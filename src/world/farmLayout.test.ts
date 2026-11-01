@@ -2,9 +2,11 @@ import { describe, it, expect } from 'vitest';
 import { ANIMALS, PENS } from '../../data/animals';
 import { FARM_CONFIG } from '../../data/farm';
 import { CONFIG } from '../core/constants';
-import { FARMER_HOUSE, PORCH } from './farmerPorch';
+import { DOOR_SPOT, FARMER_HOUSE, PORCH } from './farmerPorch';
 import {
+  ENTRANCE_PATH,
   FARM_ENTRANCE,
+  FARM_ENTRANCE_SOLIDS,
   FARM_FENCE,
   FARM_ZONE,
   rectsOverlap,
@@ -42,9 +44,15 @@ const CASA: Rect = {
   maxZ: FARMER_HOUSE.z + (FARMER_HOUSE.width + 1.4) / 2,
 };
 
-// Vallas, en tramos [x1, z1, x2, z2]: las de la granja y las de los cercados
+// Vallas, en tramos [x1, z1, x2, z2]: las de la granja, las del arco y las de los cercados
 const VALLAS = [
   ...FARM_FENCE,
+  ...FARM_ENTRANCE_SOLIDS.map((c): [number, number, number, number] => [
+    c.cx - c.w / 2,
+    c.cz - c.d / 2,
+    c.cx + c.w / 2,
+    c.cz + c.d / 2,
+  ]),
   ...Object.values(PENS).flatMap((p): [number, number, number, number][] => [
     [p.x1, p.z1, p.x2, p.z1],
     [p.x1, p.z2, p.gateX1, p.z2],
@@ -146,14 +154,15 @@ describe('distribución de la granja', () => {
 
     it('desde la calle se llega a toda la granja por la entrada', () => {
       expect(llegaA(CALLE, ENTRADA)).toBe(true);
-      expect(llegaA(CALLE, [24, 21])).toBe(true); // tras la casa
+      expect(llegaA(CALLE, [15, 20])).toBe(true); // en mitad de la granja
+      expect(llegaA(CALLE, [DOOR_SPOT.x, DOOR_SPOT.z])).toBe(true);
       expect(llegaA(CALLE, [SALES_POINT.x, SALES_POINT.z])).toBe(true);
       expect(llegaA(CALLE, [STORAGE_DOOR_SPOT.x, STORAGE_DOOR_SPOT.z])).toBe(true);
     });
 
     it('no hay otra entrada: cerrándola, la granja queda aislada', () => {
       const cerrada = [...VALLAS, TAPON];
-      expect(llegaA(CALLE, [24, 21], cerrada)).toBe(false);
+      expect(llegaA(CALLE, [15, 20], cerrada)).toBe(false);
       expect(llegaA(CALLE, [SALES_POINT.x, SALES_POINT.z], cerrada)).toBe(false);
     });
 
@@ -163,9 +172,21 @@ describe('distribución de la granja', () => {
       }
     });
 
-    it('la entrada arranca donde termina la calle', () => {
-      expect(FARM_ENTRANCE.z1).toBe(12);
-      expect(FARM_ENTRANCE.z2 - FARM_ENTRANCE.z1).toBeGreaterThan(2);
+    it('el camino cruza el arco entre sus dos hojas', () => {
+      const hojas = FARM_ENTRANCE_SOLIDS.filter((c) => c.w > 1);
+      expect(hojas).toHaveLength(2);
+      const [norte, sur] = hojas.map((h) => h.cz).sort((a, b) => a - b);
+      expect(ENTRANCE_PATH.minZ).toBeGreaterThan(norte);
+      expect(ENTRANCE_PATH.maxZ).toBeLessThan(sur);
+      expect(ENTRANCE_PATH.minX).toBeLessThan(FARM_ENTRANCE.x);
+      expect(ENTRANCE_PATH.maxX).toBeGreaterThan(FARM_ENTRANCE.x);
+    });
+
+    it('el granjero cabe de sobra entre las hojas', () => {
+      const [norte, sur] = FARM_ENTRANCE_SOLIDS.filter((c) => c.w > 1)
+        .map((h) => h.cz)
+        .sort((a, b) => a - b);
+      expect(sur - norte - 0.1).toBeGreaterThan(2.5);
     });
   });
 

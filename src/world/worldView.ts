@@ -9,6 +9,7 @@ import { DirectionalLight } from '@babylonjs/core/Lights/directionalLight';
 import { HemisphericLight } from '@babylonjs/core/Lights/hemisphericLight';
 import { SceneLoader } from '@babylonjs/core/Loading/sceneLoader';
 import { PBRMaterial } from '@babylonjs/core/Materials/PBR/pbrMaterial';
+import { DynamicTexture } from '@babylonjs/core/Materials/Textures/dynamicTexture';
 import { StandardMaterial } from '@babylonjs/core/Materials/standardMaterial';
 import { Texture } from '@babylonjs/core/Materials/Textures/texture';
 import { Color3, Color4 } from '@babylonjs/core/Maths/math.color';
@@ -21,7 +22,16 @@ import { PhysicsImpostor } from '@babylonjs/core/Physics/v1/physicsImpostor';
 import { Scene } from '@babylonjs/core/scene';
 import type { ISceneLoaderAsyncResult, Node } from '@babylonjs/core';
 import { FARMER_HOUSE, PORCH_BARRIERS } from './farmerPorch';
-import { FARM_FENCE, SALES_POINT, SALES_STAND, WELL } from './farmLayout';
+import {
+  ENTRANCE_PATH,
+  FARM_ENTRANCE,
+  FARM_ENTRANCE_SOLIDS,
+  FARM_FENCE,
+  SALES_POINT,
+  SALES_STAND,
+  STREET_END_Z,
+  WELL,
+} from './farmLayout';
 import { STORAGE, STORAGE_WALLS } from './warehouse';
 import { WellView } from './wellView';
 
@@ -60,7 +70,7 @@ export class WorldView {
   well: { x: number; z: number };
   wellCrank: { x: number; z: number }; // donde se pone el granjero para girar la manivela
   wellView: WellView | null = null; // animación del cubo (si carga el GLB)
-  private homeWindows: PBRMaterial | null = null; // cristales: se encienden de noche
+  private nightGlow: { mat: PBRMaterial; r: number; g: number; b: number }[] = []; // de noche
   indoors = false; // el granjero está en un interior: su casa o el almacén
   daylight = 1; // luz diurna fuera: 0 de noche, 1 al mediodía
 
@@ -112,6 +122,7 @@ export class WorldView {
     this.buildDecor();
     this.buildPens();
     this.buildFarmFence();
+    this.buildFarmEntrance();
   }
 
   addShadow(mesh: AbstractMesh): void {
@@ -174,14 +185,27 @@ export class WorldView {
   // Tierra entre las baldosas; el terreno sigue siendo la superficie física.
   buildPaths(): void {
     const sand = this.mat(0.78, 0.7, 0.52);
-    const p1 = MeshBuilder.CreateBox('path1', { width: 2.2, height: 0.04, depth: 40 }, this.scene);
-    p1.position.set(0, 0.02, -8);
+    const p1 = MeshBuilder.CreateBox(
+      'path1',
+      { width: 2.2, height: 0.04, depth: STREET_END_Z + 28 },
+      this.scene,
+    );
+    p1.position.set(0, 0.02, (STREET_END_Z - 28) / 2);
     p1.material = sand;
     p1.receiveShadows = true;
     const p2 = MeshBuilder.CreateBox('path2', { width: 30, height: 0.04, depth: 2.2 }, this.scene);
     p2.position.set(-1, 0.02, -4);
     p2.material = sand;
     p2.receiveShadows = true;
+    const { minX, maxX, minZ, maxZ } = ENTRANCE_PATH;
+    const p3 = MeshBuilder.CreateBox(
+      'path3',
+      { width: maxX - minX, height: 0.04, depth: maxZ - minZ },
+      this.scene,
+    );
+    p3.position.set((minX + maxX) / 2, 0.02, (minZ + maxZ) / 2);
+    p3.material = sand;
+    p3.receiveShadows = true;
 
     // Una rejilla compartida une ambas franjas sin solapar piedras en el
     // cruce. Las piezas de los extremos se recortan a los límites del camino.
@@ -189,8 +213,9 @@ export class WorldView {
     const zOrigin = -5.1;
     const tiles = new Map<string, PathTile>();
     const paths = [
-      { minX: -1.1, maxX: 1.1, minZ: -28, maxZ: 12 },
+      { minX: -1.1, maxX: 1.1, minZ: -28, maxZ: STREET_END_Z },
       { minX: -16, maxX: 14, minZ: -5.1, maxZ: -2.9 },
+      ENTRANCE_PATH,
     ];
     for (const path of paths) {
       const minCol = Math.floor(path.minX / step);
@@ -900,7 +925,7 @@ export class WorldView {
           this.addShadow(mesh);
         }
         if (mesh.material instanceof PBRMaterial && mesh.material.name === 'M_Cristal') {
-          this.homeWindows = mesh.material;
+          this.nightGlow.push({ mat: mesh.material, r: 1, g: 0.72, b: 0.35 });
         }
       }
       for (const prim of prims) {
@@ -1134,6 +1159,106 @@ export class WorldView {
     for (const [x1, z1, x2, z2] of FARM_FENCE) this.fenceSide(x1, z1, x2, z2, fenceMat);
   }
 
+  // Arco de entrada: modelo GLB (assets/entrada_granja/, publicado en /models/) con
+  // colisiones fijas, primitivas de respaldo y el nombre pintado en su letrero.
+  buildFarmEntrance(): void {
+    const { x, z, z1, z2, signY } = FARM_ENTRANCE;
+    for (const c of FARM_ENTRANCE_SOLIDS) {
+      const hit = MeshBuilder.CreateBox(
+        'farmEntranceHit',
+        { width: c.w, height: 1.5, depth: c.d },
+        this.scene,
+      );
+      hit.position.set(c.cx, 0.75, c.cz);
+      hit.isVisible = false;
+      hit.physicsImpostor = new PhysicsImpostor(
+        hit,
+        PhysicsImpostor.BoxImpostor,
+        { mass: 0 },
+        this.scene,
+      );
+    }
+
+    // El exterior del GLB mira a -Y de Blender; -π/2 en Y lo deja hacia la calle (-x)
+    const root = new TransformNode('farmEntranceRoot', this.scene);
+    root.position.set(x, 0, z);
+    root.rotation.y = -Math.PI / 2;
+
+    const wood = this.mat(0.45, 0.3, 0.18);
+    const prims: Mesh[] = [];
+    const box = (w: number, h: number, d: number, px: number, py: number, pz: number) => {
+      const b = MeshBuilder.CreateBox(
+        'farmEntrancePrim',
+        { width: w, height: h, depth: d },
+        this.scene,
+      );
+      b.position.set(px, py, pz);
+      b.material = wood;
+      this.addShadow(b);
+      prims.push(b);
+    };
+    box(0.4, 3.3, 0.4, x, 1.65, z1);
+    box(0.4, 3.3, 0.4, x, 1.65, z2);
+    box(0.3, 0.3, z2 - z1 + 0.9, x, 3.2, z);
+    box(0.06, 1.2, 0.06, x, 3.8, z); // soporte del letrero
+
+    // Letrero, sobre la cumbrera: de cara a la cámara, que mira hacia -z
+    const tex = new DynamicTexture(
+      'granjaLetreroTex',
+      { width: 512, height: 184 },
+      this.scene,
+      true,
+    );
+    const ctx = tex.getContext() as CanvasRenderingContext2D;
+    ctx.fillStyle = '#b5834f';
+    ctx.fillRect(0, 0, 512, 184);
+    ctx.fillStyle = '#3a2614';
+    ctx.font = 'bold 96px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('🌾 Granja', 256, 98);
+    tex.update();
+    const signMat = new StandardMaterial('granjaLetreroMat', this.scene);
+    signMat.diffuseTexture = tex;
+    signMat.specularColor = Color3.Black();
+    const sign = MeshBuilder.CreatePlane(
+      'granjaLetrero',
+      { width: 1.34, height: 0.48 },
+      this.scene,
+    );
+    sign.position.set(x, signY, z + 0.055);
+    sign.rotation.y = Math.PI;
+    sign.material = signMat;
+
+    void this._loadFarmEntrance(root, prims);
+  }
+
+  private async _loadFarmEntrance(root: TransformNode, prims: Mesh[]): Promise<void> {
+    try {
+      const res = await SceneLoader.ImportMeshAsync(
+        '',
+        '/models/',
+        'entrada_granja.glb',
+        this.scene,
+      );
+      res.meshes[0].parent = root; // medidas métricas: las colisiones se apoyan en ellas
+      for (const m of res.meshes) {
+        if (m.getTotalVertices() === 0) continue;
+        m.receiveShadows = true;
+        this.addShadow(m);
+        if (m.material instanceof PBRMaterial && m.material.name === 'M_Farol') {
+          this.nightGlow.push({ mat: m.material, r: 1, g: 0.72, b: 0.35 });
+        }
+      }
+      for (const p of prims) {
+        this.shadow?.removeShadowCaster(p);
+        p.dispose();
+      }
+    } catch {
+      // fallback: se quedan los postes y la viga de primitivas
+    }
+  }
+
   // Un lado de valla: postes cada ~1.9 unidades, dos travesaños
   // horizontales y una pared invisible para la colisión del jugador.
   fenceSide(x1: number, z1: number, x2: number, z2: number, fenceMat: StandardMaterial): void {
@@ -1230,10 +1355,10 @@ export class WorldView {
     const sky = this.scene.clearColor;
     this.scene.fogColor.copyFromFloats(sky.r, sky.g, sky.b);
 
-    // Luz cálida en las ventanas de casa al anochecer
-    if (this.homeWindows) {
-      const noche = 1 - Math.min(1, f * 3);
-      this.homeWindows.emissiveColor.copyFromFloats(1 * noche, 0.72 * noche, 0.35 * noche);
+    // Luz cálida en las ventanas de casa y en los faroles de la entrada al anochecer
+    const noche = 1 - Math.min(1, f * 3);
+    for (const { mat, r, g, b } of this.nightGlow) {
+      mat.emissiveColor.copyFromFloats(r * noche, g * noche, b * noche);
     }
 
     this.daylight = f;
