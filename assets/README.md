@@ -282,7 +282,13 @@ Contenido binario del juego: modelos `.glb`, texturas y audio.
 
 Vite solo publica lo que hay en `public/`, así que los `.glb` que usa el juego
 van copiados en `public/models/` (servidos como `/models/...`); esta carpeta
-`assets/` queda como fuente versionada. El cargador glTF lo aporta
+`assets/` queda como fuente versionada. La copia publicada no es idéntica al
+fuente: la genera `pnpm optimizar:modelos` (`scripts/optimizar-modelos.mjs`),
+que reduce y recomprime texturas a WebP y simplifica las mallas densas de
+Hunyuan3D (detalle y tabla de tamaños en `docs/plans/optimizar-modelos.md`).
+Al añadir o reexportar un modelo, deja el `.glb` en `assets/`, apúntalo en la
+tabla `MODELOS` del script y relánzalo; no copies a mano a `public/models/`.
+El cargador glTF lo aporta
 `@babylonjs/loaders` (npm), registrado con `import '@babylonjs/loaders/glTF'`
 en `src/main.ts`.
 
