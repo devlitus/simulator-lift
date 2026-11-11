@@ -30,4 +30,11 @@ export default tseslint.config(
       globals: { ...globals.node },
     },
   },
+  {
+    // Scripts de build (Node), p. ej. la optimización de modelos.
+    files: ['scripts/**/*.mjs'],
+    languageOptions: {
+      globals: { ...globals.node },
+    },
+  },
 );
