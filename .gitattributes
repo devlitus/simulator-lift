@@ -1,0 +1,12 @@
+# Finales de línea: LF en el repositorio y en el árbol de trabajo, en cualquier
+# sistema (Prettier usa LF; en Windows, core.autocrlf=true los convertía a CRLF
+# y mezclaba ambos estilos en el mismo archivo).
+* text=auto eol=lf
+
+# Binarios: git no debe tocarlos
+*.glb binary
+*.jpg binary
+*.jpeg binary
+*.png binary
+*.ico binary
+*.woff2 binary
