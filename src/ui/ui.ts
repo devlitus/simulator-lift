@@ -124,18 +124,37 @@ export class GameUI {
 
   // ---------- HUD ----------
 
-  // Llamado en cada frame: solo sincroniza texto (dinero/día/hora cambian
-  // constantemente y esto es más barato que comparar snapshots).
+  // Último valor pintado de cada dato del HUD: tick() solo toca el DOM cuando
+  // cambia (escribir el mismo texto en cada frame obliga al navegador a
+  // recalcular estilos y maquetación 60 veces por segundo).
+  private shown = { money: NaN, day: NaN, weather: '', hour: NaN, energy: NaN, hint: '' };
+
+  // Llamado en cada frame: compara cuatro números y repinta solo lo que cambió.
   tick(): void {
-    this.el.money.textContent = `🪙 ${this.state.money}`;
-    const { day, weather } = this.state;
-    const season = seasonOf(day, SEASONS);
-    this.el.day.textContent =
-      `📅 Día ${day} · ${season.icon} ${season.name} ${dayOfSeason(day, SEASONS)}/${SEASONS.daysPerSeason}` +
-      ` · ${WEATHER_INFO[weather].icon}`;
-    this.el.day.title = WEATHER_INFO[weather].name;
-    this.el.time.textContent = `🕒 ${this.world.getTimeString()}`;
-    this.renderEnergy();
+    const shown = this.shown;
+    const { money, day, weather, energy } = this.state;
+    if (money !== shown.money) {
+      shown.money = money;
+      this.el.money.textContent = `🪙 ${money}`;
+    }
+    if (day !== shown.day || weather !== shown.weather) {
+      shown.day = day;
+      shown.weather = weather;
+      const season = seasonOf(day, SEASONS);
+      this.el.day.textContent =
+        `📅 Día ${day} · ${season.icon} ${season.name} ${dayOfSeason(day, SEASONS)}/${SEASONS.daysPerSeason}` +
+        ` · ${WEATHER_INFO[weather].icon}`;
+      this.el.day.title = WEATHER_INFO[weather].name;
+    }
+    const hour = Math.floor(this.world.getHour());
+    if (hour !== shown.hour) {
+      shown.hour = hour;
+      this.el.time.textContent = `🕒 ${this.world.getTimeString()}`;
+    }
+    if (energy !== shown.energy) {
+      shown.energy = energy;
+      this.renderEnergy();
+    }
   }
 
   // Barra de energía: verde → ámbar → rojo según lo que queda.
@@ -225,7 +244,11 @@ export class GameUI {
 
   // ---------- Pista de interacción ----------
 
+  // Se llama en cada frame: solo toca el DOM cuando cambia la pista.
   showHint(text: string | null): void {
+    const next = text ?? '';
+    if (next === this.shown.hint) return;
+    this.shown.hint = next;
     if (!text) {
       this.el.hint.classList.add('hidden');
       return;

@@ -4,6 +4,8 @@
 import { FreeCamera } from '@babylonjs/core/Cameras/freeCamera';
 import { Engine } from '@babylonjs/core/Engines/engine';
 import { Matrix, Vector3 } from '@babylonjs/core/Maths/math.vector';
+import { AbstractMesh } from '@babylonjs/core/Meshes/abstractMesh';
+import type { PhysicsEngine } from '@babylonjs/core/Physics/v1/physicsEngine';
 import { CannonJSPlugin } from '@babylonjs/core/Physics/v1/Plugins/cannonJSPlugin';
 import { Scene } from '@babylonjs/core/scene';
 // Babylon se importa por rutas para que Vite descarte lo que no se usa. Las
@@ -108,8 +110,34 @@ if (lowSpec) engine.setHardwareScalingLevel(2);
 // 1 s (el valor por defecto) haría atravesar muros y barreras al granjero.
 Scene.MaxDeltaTime = 100;
 
+// El juego no usa el picking de la escena (el arrastre del mapa calcula su
+// propio rayo): sin esto Babylon lanza un rayo contra todas las mallas en cada
+// movimiento y clic del ratón.
+scene.skipPointerMovePicking = true;
+scene.skipPointerDownPicking = true;
+scene.skipPointerUpPicking = true;
+
 // Física: Cannon.js (ligero, JS puro, suficiente para colisiones caja/estático)
-scene.enablePhysics(new Vector3(0, -9.81, 0), new CannonJSPlugin(true, 10, CANNON));
+const physics = new CannonJSPlugin(true, 10, CANNON);
+scene.enablePhysics(new Vector3(0, -9.81, 0), physics);
+// Casi todos los cuerpos son colisiones fijas y solo se mueve el granjero: la
+// fase ancha por barrido evita comparar cada cuerpo con todos los demás.
+const physicsWorld = physics.world as CANNON.World;
+physicsWorld.broadphase = new CANNON.SAPBroadphase(physicsWorld);
+
+// Las colisiones fijas no se mueven nunca: se dejan de sincronizar malla y
+// cuerpo en cada paso de física y de recalcular su matriz en cada frame. Se
+// llama una vez, con todas las vistas ya construidas.
+function freezeStaticColliders(): void {
+  const engineV1 = scene.getPhysicsEngine() as PhysicsEngine | null; // física V1 (Cannon)
+  for (const impostor of engineV1?.getImpostors() ?? []) {
+    if (impostor.mass !== 0) continue;
+    physicsWorld.removeEventListener('preStep', impostor.beforeStep);
+    physicsWorld.removeEventListener('postStep', impostor.afterStep);
+    const malla = impostor.object;
+    if (malla instanceof AbstractMesh) malla.freezeWorldMatrix();
+  }
+}
 
 // ---------- Bus de eventos + estado central ----------
 const bus = new EventBus();
@@ -163,6 +191,7 @@ const ui = new GameUI(
 const npcs = new NPCSystemView(scene, world, state, ui, quests, friendship, NPC_DEFS, CROPS);
 const villagers = new VillagerView(scene, world, ui, VILLAGERS);
 const saveRepo = new SaveRepository(window.localStorage);
+freezeStaticColliders();
 
 // Distancia al punto de la manivela para poder girarla (el pozo, con su
 // colisión, impide acercarse más desde ese lado).
@@ -656,9 +685,12 @@ engine.runRenderLoop(() => {
   const dt = Math.min(engine.getDeltaTime() / 1000, 0.1); // tope anti-saltos
   // Se deduce de la posición: el escenario no puede quedar desfasado del granjero
   const { x: px, y: py, z: pz } = player.position;
-  world.indoors = interiorViewAt(px, pz) !== null;
-  camera.maxZ = world.indoors ? INDOORS_MAX_Z : OUTDOORS_MAX_Z;
-  document.body.classList.toggle('indoors', world.indoors); // el CSS oculta el HUD de fuera
+  const indoors = interiorViewAt(px, pz) !== null;
+  if (indoors !== world.indoors) {
+    world.indoors = indoors;
+    camera.maxZ = indoors ? INDOORS_MAX_Z : OUTDOORS_MAX_Z;
+    document.body.classList.toggle('indoors', indoors); // el CSS oculta el HUD de fuera
+  }
   world.update(dt, state.day);
   checkBedtime();
   homeInterior.update(dt, world.daylight);
