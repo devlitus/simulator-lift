@@ -15,14 +15,14 @@ import { DynamicTexture } from '@babylonjs/core/Materials/Textures/dynamicTextur
 import { StandardMaterial } from '@babylonjs/core/Materials/standardMaterial';
 import { Texture } from '@babylonjs/core/Materials/Textures/texture';
 import { Color3, Color4 } from '@babylonjs/core/Maths/math.color';
-import { Vector3 } from '@babylonjs/core/Maths/math.vector';
+import { Matrix, Quaternion, Vector3 } from '@babylonjs/core/Maths/math.vector';
 import { AbstractMesh } from '@babylonjs/core/Meshes/abstractMesh';
 import { Mesh } from '@babylonjs/core/Meshes/mesh';
 import { MeshBuilder } from '@babylonjs/core/Meshes/meshBuilder';
 import { TransformNode } from '@babylonjs/core/Meshes/transformNode';
 import { PhysicsImpostor } from '@babylonjs/core/Physics/v1/physicsImpostor';
 import { Scene } from '@babylonjs/core/scene';
-import type { AssetContainer, ISceneLoaderAsyncResult, Node } from '@babylonjs/core';
+import type { AssetContainer, ISceneLoaderAsyncResult } from '@babylonjs/core';
 import { FARMER_HOUSE, PORCH_BARRIERS } from './farmerPorch';
 import {
   ENTRANCE_PATH,
@@ -112,6 +112,10 @@ export class WorldView {
     if (shadows) {
       this.shadow = new ShadowGenerator(1024, this.sun);
       this.shadow.usePercentageCloserFiltering = true;
+      // Con el sol bajo la luz llega rasante: sin bias aparecen bandas de
+      // auto-sombra (acne) que titilan al moverse el sol.
+      this.shadow.bias = 0.0015;
+      this.shadow.normalBias = 0.02;
     }
 
     // Punto de venta: delante del mostrador del puesto (main.ts lo usa como
@@ -130,6 +134,7 @@ export class WorldView {
     this.buildDecor();
     this.buildPens();
     this.buildFarmFence();
+    this.mergeFences();
     this.buildFarmEntrance();
   }
 
@@ -137,10 +142,19 @@ export class WorldView {
     this.shadow?.getShadowMap()?.renderList?.push(mesh);
   }
 
-  mat(r: number, g: number, b: number): StandardMaterial {
+  // Un material por color, compartido: los colores lisos se repiten mucho
+  // (vallas, tejados, casas de respaldo). Quien vaya a modificar el suyo pide
+  // una copia propia con `own`.
+  private mats = new Map<string, StandardMaterial>();
+
+  mat(r: number, g: number, b: number, own = false): StandardMaterial {
+    const key = `${r},${g},${b}`;
+    const shared = own ? undefined : this.mats.get(key);
+    if (shared) return shared;
     const m = new StandardMaterial('mat', this.scene);
     m.diffuseColor = new Color3(r, g, b);
     m.specularColor = Color3.Black();
+    if (!own) this.mats.set(key, m);
     return m;
   }
 
@@ -151,7 +165,7 @@ export class WorldView {
     // Césped pintado (ComfyUI, ver assets/escenario/) repetido cada 5 m y
     // teñido por un mapa de variación que cubre todo el terreno una vez, para
     // que no se note la repetición. Sin las texturas queda el verde liso.
-    const mat = this.mat(0.36, 0.62, 0.3);
+    const mat = this.mat(0.36, 0.62, 0.3, true); // propio: lleva texturas y el tinte de estación
     const grass = new Texture('/textures/cesped.jpg', this.scene);
     grass.uScale = grass.vScale = s / 5;
     mat.diffuseTexture = grass;
@@ -267,25 +281,32 @@ export class WorldView {
       }
     }
 
-    const stone = this.mat(0.69, 0.59, 0.43);
-    const prims = [...tiles.values()].map((tile, i) => {
+    // Cientos de baldosas iguales: se funden en una sola malla (una llamada
+    // de dibujo) en vez de dibujarse y evaluarse una a una en cada frame.
+    const boxes = [...tiles.values()].map((tile, i) => {
       const mesh = MeshBuilder.CreateBox(
         `pathTileFallback_${i}`,
         { width: tile.width, height: 0.035, depth: tile.depth },
         this.scene,
       );
       mesh.position.set(tile.x, 0.0575, tile.z);
-      mesh.material = stone;
-      mesh.receiveShadows = true;
-      mesh.isPickable = false;
       return mesh;
     });
+    const merged = Mesh.MergeMeshes(boxes, true, true);
+    const prims: Mesh[] = [];
+    if (merged) {
+      merged.name = 'pathTilesFallback';
+      merged.material = this.mat(0.69, 0.59, 0.43);
+      merged.receiveShadows = true;
+      merged.isPickable = false;
+      merged.freezeWorldMatrix();
+      prims.push(merged);
+    }
     void this._loadPathTiles([...tiles.values()], prims);
   }
 
   private async _loadPathTiles(tiles: PathTile[], prims: Mesh[]): Promise<void> {
     const imports: ISceneLoaderAsyncResult[] = [];
-    const roots: TransformNode[] = [];
     try {
       // Solo tres importaciones; cada baldosa comparte la geometría y el
       // material de su variante mediante instancias de Babylon.
@@ -306,43 +327,44 @@ export class WorldView {
         if (spans.some((span) => !Number.isFinite(span) || span <= 0)) {
           throw new Error('Baldosa sin dimensiones válidas');
         }
-        // Las instancias se dibujan con la configuración de su malla fuente.
-        for (const mesh of res.meshes) {
-          mesh.receiveShadows = true;
-          mesh.isPickable = false;
-        }
-        template.setEnabled(false);
-        for (let j = 0; j < tiles.length; j++) {
-          const tile = tiles[j];
+        // Colocación de cada baldosa de esta variante: escala a su hueco y
+        // la apoya centrada sobre el camino.
+        const placements: Matrix[] = [];
+        for (const tile of tiles) {
           if (tile.variant !== i - 1) continue;
           const sx = tile.width / spans[0];
           const sy = 0.035 / spans[1];
           const sz = tile.depth / spans[2];
-          const root = new TransformNode(`pathTile_${j}`, this.scene);
-          roots.push(root);
-          root.scaling.set(sx, sy, sz);
-          root.position.set(
-            tile.x - ((min.x + max.x) / 2) * sx,
-            0.04 - min.y * sy,
-            tile.z - ((min.z + max.z) / 2) * sz,
+          placements.push(
+            Matrix.Compose(
+              new Vector3(sx, sy, sz),
+              Quaternion.Identity(),
+              new Vector3(
+                tile.x - ((min.x + max.x) / 2) * sx,
+                0.04 - min.y * sy,
+                tile.z - ((min.z + max.z) / 2) * sz,
+              ),
+            ),
           );
-          template.instantiateHierarchy(
-            root,
-            { doNotInstantiate: false },
-            (_source: Node, clone: Node) => {
-              clone.setEnabled(true);
-              if (!(clone instanceof AbstractMesh)) return;
-              clone.receiveShadows = true;
-              clone.isPickable = false;
-            },
-          );
-          root.setEnabled(false);
         }
+        // Thin instances: una llamada de dibujo por variante. La matriz de
+        // cada copia es W·D·W⁻¹ (W: mundo de la malla importada; D: su
+        // colocación), como en SceneryView. Quedan ocultas hasta tener las tres.
+        for (const mesh of res.meshes) {
+          if (!(mesh instanceof Mesh) || mesh.getTotalVertices() === 0) continue;
+          mesh.receiveShadows = true;
+          mesh.isPickable = false;
+          const w = mesh.computeWorldMatrix(true);
+          const wInv = w.clone().invert();
+          mesh.thinInstanceAdd(placements.map((d) => w.multiply(d).multiply(wInv)));
+          mesh.thinInstanceRefreshBoundingInfo();
+          mesh.freezeWorldMatrix();
+        }
+        template.setEnabled(false);
       }
-      for (const root of roots) root.setEnabled(true);
+      for (const res of imports) res.meshes[0].setEnabled(true);
       for (const prim of prims) prim.dispose();
     } catch {
-      for (const root of roots) root.dispose();
       for (const res of imports) {
         for (const mesh of res.meshes) mesh.dispose(false, true);
       }
@@ -867,16 +889,38 @@ export class WorldView {
     this._loadTree(root, variant, prims);
   }
 
+  // Cada variante de árbol se descarga y se sube a la GPU una sola vez; los
+  // árboles son clones que comparten su geometría y sus texturas.
+  private treeModels = new Map<string, Promise<AssetContainer>>();
+
+  private treeModel(variant: string): Promise<AssetContainer> {
+    let carga = this.treeModels.get(variant);
+    if (!carga) {
+      carga = SceneLoader.LoadAssetContainerAsync('/models/', variant, this.scene).then(
+        (container) => {
+          for (const m of container.materials) this.scene.addMaterial(m);
+          return container;
+        },
+      );
+      this.treeModels.set(variant, carga);
+    }
+    return carga;
+  }
+
   private async _loadTree(root: TransformNode, variant: string, prims: Mesh[]): Promise<void> {
     try {
-      const res = await SceneLoader.ImportMeshAsync('', '/models/', variant, this.scene);
-      const model = res.meshes[0];
+      const container = await this.treeModel(variant);
+      const copia = container.instantiateModelsToScene((n) => n, false, {
+        doNotInstantiate: true,
+      });
+      const model = copia.rootNodes[0];
+      if (!(model instanceof TransformNode)) throw new Error('Árbol sin malla');
       const { min, max } = model.getHierarchyBoundingVectors(true);
       const escala = 4 / (max.y - min.y);
       model.parent = root;
       model.scaling = new Vector3(escala, escala, escala);
       model.position.y = -min.y * escala;
-      for (const mesh of res.meshes) {
+      for (const mesh of model.getChildMeshes(false)) {
         if (mesh.getTotalVertices() > 0) this.addShadow(mesh);
       }
       for (const prim of prims) prim.dispose();
@@ -975,7 +1019,7 @@ export class WorldView {
       }
       for (const prim of prims) {
         this.shadow?.removeShadowCaster(prim);
-        prim.dispose(false, true);
+        prim.dispose();
       }
     } catch {
       // Fallback: la casa de primitivas y su colisión siguen disponibles.
@@ -1060,7 +1104,7 @@ export class WorldView {
       for (const mesh of imported.meshes) mesh.receiveShadows = true;
       this.addShadow(lod0);
       this.shadow?.removeShadowCaster(fallback);
-      fallback.dispose(false, true);
+      fallback.dispose();
 
       // Cubo, cuerda y manivela vienen como mallas sueltas para animarlas
       const pieza = (name: string) => imported!.meshes.find((m) => m.name === name);
@@ -1093,7 +1137,6 @@ export class WorldView {
   buildPens(): void {
     const pens = Object.values(this.pens);
     const floorMat = this.mat(0.82, 0.72, 0.45);
-    const fenceMat = this.mat(0.5, 0.36, 0.2);
     for (const { x1, x2, z1, z2, gateX1, gateX2 } of pens) {
       const floor = MeshBuilder.CreateBox(
         'penFloor',
@@ -1104,19 +1147,18 @@ export class WorldView {
       floor.material = floorMat;
       floor.receiveShadows = true;
 
-      this.fenceSide(x1, z1, x2, z1, fenceMat); // norte
-      this.fenceSide(x1, z2, gateX1, z2, fenceMat); // sur, a un lado de la puerta
-      this.fenceSide(gateX2, z2, x2, z2, fenceMat); // sur, al otro
-      this.fenceSide(x1, z1, x1, z2, fenceMat); // oeste
+      this.fenceSide(x1, z1, x2, z1); // norte
+      this.fenceSide(x1, z2, gateX1, z2); // sur, a un lado de la puerta
+      this.fenceSide(gateX2, z2, x2, z2); // sur, al otro
+      this.fenceSide(x1, z1, x1, z2); // oeste
       // El lado este solo si no lo pone ya el cercado vecino como su oeste
-      if (!pens.some((p) => p.x1 === x2)) this.fenceSide(x2, z1, x2, z2, fenceMat);
+      if (!pens.some((p) => p.x1 === x2)) this.fenceSide(x2, z1, x2, z2);
     }
   }
 
   // Valla de la granja, con su único hueco en el lado de la calle (ver farmLayout).
   buildFarmFence(): void {
-    const fenceMat = this.mat(0.5, 0.36, 0.2);
-    for (const [x1, z1, x2, z2] of FARM_FENCE) this.fenceSide(x1, z1, x2, z2, fenceMat);
+    for (const [x1, z1, x2, z2] of FARM_FENCE) this.fenceSide(x1, z1, x2, z2);
   }
 
   // Arco de entrada: modelo GLB (assets/entrada_granja/, publicado en /models/) con
@@ -1219,9 +1261,26 @@ export class WorldView {
     }
   }
 
+  // Postes y travesaños de todas las vallas, a la espera de mergeFences()
+  private fenceParts: Mesh[] = [];
+
+  // Todas las vallas comparten material: sus ~130 piezas se funden en una
+  // sola malla, que se dibuja (y da sombra) con una única llamada.
+  mergeFences(): void {
+    const merged = Mesh.MergeMeshes(this.fenceParts, true, true);
+    this.fenceParts = [];
+    if (!merged) return;
+    merged.name = 'fences';
+    merged.material = this.mat(0.5, 0.36, 0.2);
+    merged.isPickable = false;
+    merged.freezeWorldMatrix();
+    this.addShadow(merged);
+  }
+
   // Un lado de valla: postes cada ~1.9 unidades, dos travesaños
-  // horizontales y una pared invisible para la colisión del jugador.
-  fenceSide(x1: number, z1: number, x2: number, z2: number, fenceMat: StandardMaterial): void {
+  // horizontales y una pared invisible para la colisión del jugador. Las
+  // piezas visibles se acumulan en fenceParts.
+  fenceSide(x1: number, z1: number, x2: number, z2: number): void {
     const dx = x2 - x1;
     const dz = z2 - z1;
     const len = Math.hypot(dx, dz);
@@ -1238,8 +1297,7 @@ export class WorldView {
         this.scene,
       );
       post.position.set(x1 + dx * t, 0.45, z1 + dz * t);
-      post.material = fenceMat;
-      this.addShadow(post);
+      this.fenceParts.push(post);
     }
 
     for (const y of [0.35, 0.68]) {
@@ -1251,8 +1309,7 @@ export class WorldView {
         this.scene,
       );
       rail.position.set(cx, y, cz);
-      rail.material = fenceMat;
-      this.addShadow(rail);
+      this.fenceParts.push(rail);
     }
 
     const wall = MeshBuilder.CreateBox(
@@ -1300,11 +1357,20 @@ export class WorldView {
     this.hemi.intensity = 0.16 + f * 0.55 * (1 - 0.25 * o);
 
     // El sol recorre el cielo de este a oeste durante el día
-    if (f > 0.01) {
-      const ang = ((h - 6) / 14) * Math.PI;
-      const dy = Math.max(Math.sin(ang), 0.2);
-      this.sun.direction.copyFromFloats(-Math.cos(ang), -dy, -0.35);
-      this.sun.position.copyFromFloats(Math.cos(ang) * 40, dy * 40, 14);
+    // (siempre, para que al amanecer no salte desde la dirección del ocaso).
+    // La elevación mínima evita sombras kilométricas que estiran el mapa.
+    const ang = Math.min(Math.max((h - 6) / 14, 0), 1) * Math.PI;
+    const dy = Math.max(Math.sin(ang), 0.45);
+    this.sun.direction.copyFromFloats(-Math.cos(ang), -dy, -0.35);
+    this.sun.position.copyFromFloats(Math.cos(ang) * 40, dy * 40, 14);
+
+    // Las sombras se desvanecen suavemente cerca del horizonte en vez de
+    // encenderse y apagarse de golpe; de noche ni se calculan.
+    if (this.shadow) {
+      const t = Math.min(Math.max((f - 0.05) / 0.3, 0), 1);
+      const fuerza = t * t * (3 - 2 * t) * (1 - 0.6 * o);
+      this.shadow.setDarkness(1 - fuerza);
+      this.sun.shadowEnabled = fuerza > 0.01;
     }
 
     // Color del cielo: azul noche ↔ azul día
@@ -1334,6 +1400,10 @@ export class WorldView {
     if (this.indoors) {
       this.sun.intensity = 0.45;
       this.hemi.intensity = 0.8;
+      if (this.shadow) {
+        this.shadow.setDarkness(0);
+        this.sun.shadowEnabled = true;
+      }
       sky.copyFromFloats(0.07, 0.05, 0.04, 1);
     }
   }

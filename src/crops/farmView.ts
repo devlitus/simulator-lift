@@ -146,7 +146,7 @@ export class FarmView {
         tile.mesh?.dispose();
         tile.mesh = null;
       }
-      this.sync();
+      this.sync(true);
     } catch {
       for (const root of roots) root.dispose(false, true);
       if (imported) {
@@ -173,10 +173,21 @@ export class FarmView {
     return this.cropMats[type];
   }
 
-  // Reconstruye los meshes de todos los surcos según el estado del dominio
-  sync(): void {
+  // Lo último que se dibujó en cada surco. FARM_CHANGED no dice qué surco
+  // cambió, así que se compara: regar o plantar uno ya no destruye y vuelve a
+  // crear las mallas de toda la parcela (un tirón en cada labor).
+  private drawn: string[] = [];
+
+  // Reconstruye los meshes de los surcos cuyo estado cambió. Con `force` se
+  // repintan todos (al sustituir las cajas de tierra por el modelo).
+  sync(force = false): void {
     for (let i = 0; i < this.tiles.length; i++) {
-      this.syncTile(i, this.logic.status(i));
+      const status = this.logic.status(i);
+      const crop = status.crop;
+      const key = crop ? `${status.kind}|${crop.type}|${crop.stage}|${crop.watered}` : status.kind;
+      if (!force && this.drawn[i] === key) continue;
+      this.drawn[i] = key;
+      this.syncTile(i, status);
     }
   }
 
